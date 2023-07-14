@@ -6,51 +6,32 @@ import re
 from pathlib import Path
 from datetime import datetime
 
-from exif import Image as exifImage
-from PIL import Image as pilImage, ImageOps, ImageFont, ImageDraw
+import exif
+from PIL import Image, ImageOps, ImageFont, ImageDraw
 
 
-valid_actions = []
+configs = None
 images_directory = ""
 all_images_exif_data = {}
 rotation = [1, 8, 3, 6]  # Rotation of images, as represented in EXIF
+valid_actions = []
 
 
-def load_images_directory(precision: str) -> None:
-    global images_directory
-    images_directory = (
-        input("Images Folder\n(type full path or drag folder onto here): ")
-        .replace("\\", "")
-        .strip("'")
-        .strip()
-    )
-    images = []
-    items = Path(images_directory).glob("*.*")
-    for each_item in items:
-        if re.match(".*\.jpe?g", each_item.name, flags=re.IGNORECASE):
-            images.append(each_item.name)
-            images.sort()
-    if len(images) == 0:
-        images_directory = ""
-        print("NOTICE: There were no valid JPEG images in the selected directory.")
-    create_csv(precision)
-    main()
-
-
-def facing(azimuth, precision) -> str:
-    increment = 22.5
-    directions = [
-        "N",
-        "NE",
-        "E",
-        "SE",
-        "S",
-        "SW",
-        "W",
-        "NW",
-        "N",
-    ]
-    if precision == "fine":
+def facing(azimuth) -> str:
+    if configs["FACING"]["precision"] == "coarse":
+        increment = 22.5
+        directions = [
+            "N",
+            "NE",
+            "E",
+            "SE",
+            "S",
+            "SW",
+            "W",
+            "NW",
+            "N",
+        ]
+    elif configs["FACING"]["precision"] == "fine":
         increment = 11.25
         directions = [
             "N",
@@ -72,7 +53,7 @@ def facing(azimuth, precision) -> str:
             "N",
         ]
     try:
-        if precision == "precise":
+        if configs["FACING"]["precision"] == "precise":
             bearing = f"{round(azimuth)}°"
         else:
             bearing = directions[math.ceil(math.floor((azimuth % 360) / increment) / 2)]
@@ -92,26 +73,69 @@ def parse_gps_coords(lat, lon, ns, ew) -> str:
 
 def display_menu() -> str:
     global valid_actions
-    print("--------------------------")
+    if images_directory:
+        print(f"\nPhotos Folder: {images_directory}")
+    else:
+        print(f"\nPhotos Folder: (not set)")
+    print("----------------------------")
     print(" Choose an action:")
-    print(" 1 - Create New Photo Log")
+    print(" 1 - Load Photos from Folder")
     valid_actions = ["1"]
     if images_directory:
-        print(" 2 - Annotate Photos")
+        print(" 2 - Create New Photo Log")
         valid_actions.append("2")
-        print(" 3 - Create Word Document")
+    csv_file = Path(images_directory) / "Photo Log.csv"
+    if csv_file.is_file():
+        print(" 3 - Annotate Photos")
         valid_actions.append("3")
+        print(" 4 - Create Word Document")
+        valid_actions.append("4")
     print(" Q - Quit")
     valid_actions.append("Q")
-    print("--------------------------")
+    print("----------------------------")
     return input().upper()
 
 
-def create_csv(precision) -> None:
+def view_csv_file(csv_file) -> None:
+    if input("Type “Y” to open this file now. ").upper() == "Y":
+        try:
+            os.startfile(csv_file)
+        except:
+            os.system(f'open "{csv_file}"')
+
+
+def load_photos() -> None:
+    global images_directory
     global all_images_exif_data
     all_images_exif_data = {}
-    if not images_directory:
-        main()
+    images_directory = (
+        input("Enter the Images Folder\n(type the path or drag the folder onto here): ")
+        .replace("\\", "")
+        .strip("'")
+        .strip()
+    )
+    if images_directory.startswith("~"):
+        images_directory = images_directory.replace("~", str(Path.home()), 1)
+    images = []
+    items = Path(images_directory).glob("*.*")
+    for each_item in items:
+        if re.match(".*\.jpe?g", each_item.name, flags=re.IGNORECASE):
+            images.append(each_item.name)
+            images.sort()
+    if len(images) == 0:
+        images_directory = ""
+        print("NOTICE: There were no valid JPEG images in the selected directory.")
+    else:
+        for each_image in images:
+            with open(Path(images_directory) / each_image, "rb") as f:
+                the_image = exif.Image(f)
+                all_images_exif_data[each_image] = the_image
+                if not all_images_exif_data[each_image].has_exif:
+                    all_images_exif_data[each_image].set("artist", "")
+    main()
+
+
+def create_csv() -> None:
     headers = [
         "Photo",
         "Photographer",
@@ -122,71 +146,64 @@ def create_csv(precision) -> None:
         "Facing",
         "Description",
     ]
-    csv_file = Path(images_directory) / "Photo Log.csv"
-    if csv_file.is_file():
-        if (
-            input(f"“{csv_file}” already exists. Type “Y” to overwrite it. ").upper()
-            != "Y"
-        ):
-            main()
-    images = []
-    items = Path(images_directory).glob("*.*")
-    for each_item in items:
-        if re.match(".*\.jpe?g", each_item.name, flags=re.IGNORECASE):
-            images.append(each_item.name)
-            images.sort()
-    if len(images) == 0:
-        print("NOTICE: There were no valid JPEG images in the selected directory.")
-    else:
-        data_for_csv = []
-        for each_image in images:
-            image_data = {"Photo": each_image}
-            with open(Path(images_directory) / each_image, "rb") as f:
-                the_image = exifImage(f)
-                all_images_exif_data[each_image] = the_image
-                image_data["Photographer"] = the_image.get("artist")
-                try:
-                    timestamp = str(
-                        datetime.strptime(
-                            the_image.get("datetime_original"), "%Y:%m:%d %H:%M:%S"
-                        )
-                    )
-                except:
-                    timestamp = ""
-                image_data["Timestamp"] = timestamp
-                image_data["GPS Coordinates"] = parse_gps_coords(
-                    the_image.get("gps_latitude"),
-                    the_image.get("gps_longitude"),
-                    the_image.get("gps_latitude_ref"),
-                    the_image.get("gps_longitude_ref"),
-                )
-                image_data["Description"] = ""
-                # Photo taken with iOS Camera.app:
-                if the_image.get("image_description"):
-                    image_data["Description"] = the_image.get(
-                        "image_description"
-                    ).strip()
-                # Photo taken with Theodolite.app:
-                if the_image.get("user_comment"):
-                    image_data["Description"] = the_image.get("user_comment").strip()
-                image_data["Facing"] = facing(
-                    the_image.get("gps_img_direction"), precision
-                )
-            data_for_csv.append(image_data)
-        with open(csv_file, "w") as f:
-            csv_out = csv.DictWriter(f, fieldnames=headers)
-            csv_out.writeheader()
-            csv_out.writerows(data_for_csv)
-        print("“Photo Log.csv” created.")
-        if input("Type “Y” to open this file now. ").upper() == "Y":
-            try:
-                os.startfile(csv_file)
-            except:
-                os.system(f'open "{csv_file}"')
+    if not all_images_exif_data:
         main()
+    csv_file = Path(images_directory) / "Photo Log.csv"
+    if (
+        csv_file.is_file()
+        and input(f"“{csv_file}” already exists. Type “Y” to overwrite it. ").upper()
+        != "Y"
+    ):
+        view_csv_file(csv_file)
+        main()
+    data_for_csv = []
+    for each_image in all_images_exif_data:
+        image_data = {"Photo": each_image}
+        try:
+            image_data["Photographer"] = all_images_exif_data[each_image].get("artist")
+        except:
+            image_data["Photographer"] = ""
+        try:
+            timestamp = str(
+                datetime.strptime(
+                    all_images_exif_data[each_image].get("datetime_original"),
+                    "%Y:%m:%d %H:%M:%S",
+                )
+            )
+        except:
+            timestamp = ""
+        image_data["Timestamp"] = timestamp
+        image_data["GPS Coordinates"] = parse_gps_coords(
+            all_images_exif_data[each_image].get("gps_latitude"),
+            all_images_exif_data[each_image].get("gps_longitude"),
+            all_images_exif_data[each_image].get("gps_latitude_ref"),
+            all_images_exif_data[each_image].get("gps_longitude_ref"),
+        )
+        image_data["Description"] = ""
+        # Photo taken with iOS Camera.app:
+        if all_images_exif_data[each_image].get("image_description"):
+            image_data["Description"] = (
+                all_images_exif_data[each_image].get("image_description").strip()
+            )
+        # Photo taken with Theodolite.app:
+        if all_images_exif_data[each_image].get("user_comment"):
+            image_data["Description"] = (
+                all_images_exif_data[each_image].get("user_comment").strip()
+            )
+        image_data["Facing"] = facing(
+            all_images_exif_data[each_image].get("gps_img_direction")
+        )
+        data_for_csv.append(image_data)
+    with open(csv_file, "w") as f:
+        csv_out = csv.DictWriter(f, fieldnames=headers)
+        csv_out.writeheader()
+        csv_out.writerows(data_for_csv)
+    print("“Photo Log.csv” created.")
+    view_csv_file(csv_file)
+    main()
 
 
-def annotate_photos(upateoriginals) -> None:
+def annotate_photos() -> None:
     global all_images_exif_data
     if not images_directory:
         main()
@@ -201,7 +218,9 @@ def annotate_photos(upateoriginals) -> None:
     csv_file = Path(images_directory) / "Photo Log.csv"
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f)
+        i = 1
         for each_photo in reader:
+            print(f"{i}: Annotating photo {each_photo['Photo']}")
             label = []
             line = []
             if each_photo["Project"]:
@@ -224,7 +243,9 @@ def annotate_photos(upateoriginals) -> None:
             if not label:
                 label = ["(unlabeled)"]
             orientation = all_images_exif_data[each_photo["Photo"]].get("orientation")
-            img = pilImage.open(Path(images_directory) / each_photo["Photo"])
+            if not orientation:
+                orientation = 1
+            img = Image.open(Path(images_directory) / each_photo["Photo"])
             img = img.rotate(rotation.index(orientation) * 90, expand=True)
             img = ImageOps.pad(img, (img.width, img.height + 200), centering=(0, 0))
             img_annotion = ImageDraw.Draw(img, mode="RGB")
@@ -248,12 +269,13 @@ def annotate_photos(upateoriginals) -> None:
             img.close()
             update_exif_data(
                 images_directory,
-                each_photo["Photo"],
-                filename,
+                each_photo["Photo"],  # original photo
+                filename,  # annotated photo
                 each_photo["Photographer"],
                 each_photo["Description"],
             )
-            # TODO: output a count of the total number of images annotated
+            i += 1
+    main()
 
 
 def update_exif_data(
@@ -266,22 +288,31 @@ def update_exif_data(
     # First update all_images_exif_data with the values from the CSV
     all_images_exif_data[original].set("artist", photographer)
     if all_images_exif_data[original].get("user_comment"):
+        # Theodolite has a weird extra character in the user_comment tag that needs to be removed or it will crash the exif package.
         all_images_exif_data[original].set("user_comment", description[:-1])
     else:
         all_images_exif_data[original].set("image_description", description)
-    # Next update the original photo.
-    with open(Path(images_directory) / original, "wb") as f:
-        f.write(all_images_exif_data[original].get_file())
-    # Finally update the annotated photo.
     with open(Path(images_directory) / "Annotated Photos" / annotated, "rb") as f:
         all_images_exif_data[original].set("get_file", f.read())
     with open(Path(images_directory) / "Annotated Photos" / annotated, "wb") as f:
-        all_images_exif_data[original].delete("pixel_x_dimension")
-        all_images_exif_data[original].delete("pixel_y_dimension")
+        if all_images_exif_data[original].get("pixel_x_dimension"):
+            all_images_exif_data[original].delete("pixel_x_dimension")
+        if all_images_exif_data[original].get("pixel_y_dimension"):
+            all_images_exif_data[original].delete("pixel_y_dimension")
         f.write(all_images_exif_data[original].get_file)
+    # Finally update the original photo.
+    if configs["CAPTIONS"]["updateoriginals"] == "yes":
+        with open(Path(images_directory) / original, "wb") as f:
+            f.write(all_images_exif_data[original].get_file)
+
+
+def create_word_doc() -> None:
+    # TODO: create Word doc
+    print("Create Word Document isn’t implemented yet.")
 
 
 def main() -> None:
+    global configs
     configs = configparser.ConfigParser()
     try:
         with open("configs.ini", "r") as f:
@@ -302,16 +333,16 @@ def main() -> None:
     while action not in valid_actions:
         action = display_menu()
     if action == "1":
-        load_images_directory(configs["FACING"]["precision"])
+        load_photos()
     elif action == "2":
-        annotate_photos(configs["CAPTIONS"]["updateoriginals"])
+        create_csv()
+    elif action == "3":
+        annotate_photos()
+    elif action == "4":
+        create_word_doc()
     elif action == "Q":
         exit()
 
 
 if __name__ == "__main__":
     main()
-
-# TODO: clear extraneous input that causes the annotation to run twice if the user bungled the "overwrite" warning
-# TODO: create Word doc
-# TODO: create config file that controls: coarse/fine/precise facing, whether to write corrected captions back to originals, ??
