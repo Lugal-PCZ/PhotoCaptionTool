@@ -110,10 +110,12 @@ def load_photos() -> None:
     all_images_exif_data = {}
     images_directory = (
         input("Enter the Images Folder\n(type the path or drag the folder onto here): ")
-        .replace("\\", "")
         .strip("'")
+        .strip('"')
         .strip()
     )
+    if "PosixPath" in str(type(Path())):
+        images_directory = images_directory.replace("\\", "")
     if images_directory.startswith("~"):
         images_directory = images_directory.replace("~", str(Path.home()), 1)
     images = []
@@ -194,7 +196,7 @@ def create_csv() -> None:
             all_images_exif_data[each_image].get("gps_img_direction")
         )
         data_for_csv.append(image_data)
-    with open(csv_file, "w") as f:
+    with open(csv_file, "w", newline="") as f:
         csv_out = csv.DictWriter(f, fieldnames=headers)
         csv_out.writeheader()
         csv_out.writerows(data_for_csv)
@@ -249,7 +251,10 @@ def annotate_photos() -> None:
             img = img.rotate(rotation.index(orientation) * 90, expand=True)
             img = ImageOps.pad(img, (img.width, img.height + 200), centering=(0, 0))
             img_annotion = ImageDraw.Draw(img, mode="RGB")
-            thefont = ImageFont.truetype("Helvetica.ttc", 46)
+            try:
+                thefont = ImageFont.truetype("Helvetica.ttc", 46)
+            except:
+                thefont = ImageFont.truetype("arial.ttf", 46)
             img_annotion.text(
                 (20, img.height - 180),
                 "\n".join(label),
@@ -267,43 +272,42 @@ def annotate_photos() -> None:
                 progressive=True,
             )
             img.close()
-            update_exif_data(
-                images_directory,
-                each_photo["Photo"],  # original photo
-                filename,  # annotated photo
-                each_photo["Photographer"],
-                each_photo["Description"],
-            )
+            if configs["CAPTIONS"]["updateoriginals"] == "yes":
+                update_original_image_exif_data(
+                    images_directory,
+                    each_photo["Photo"],  # original photo
+                    each_photo["Photographer"],
+                    each_photo["Project"],
+                    each_photo["Site"],
+                    each_photo["Description"],
+                )
             i += 1
     main()
 
 
-def update_exif_data(
+def update_original_image_exif_data(
     images_directory: Path,
     original: str,
-    annotated: str,
     photographer: str,
+    project: str,
+    site: str,
     description: str,
 ) -> None:
-    # First update all_images_exif_data with the values from the CSV
-    all_images_exif_data[original].set("artist", photographer)
+    # Update all_images_exif_data with the values from the CSV
+    if photographer:
+        all_images_exif_data[original].set("artist", photographer)
+    caption = ""
+    if project:
+        caption = f"Project: {project}. "
+    if site:
+        caption += f"Site: {site}. "
+    caption += description
+    all_images_exif_data[original].set("image_description", caption)
+    # Delete the Theodolite caption saved in the user_comment EXIF field
     if all_images_exif_data[original].get("user_comment"):
-        # Theodolite has a weird extra character in the user_comment tag that needs to be removed or it will crash the exif package.
-        all_images_exif_data[original].set("user_comment", description[:-1])
-    else:
-        all_images_exif_data[original].set("image_description", description)
-    with open(Path(images_directory) / "Annotated Photos" / annotated, "rb") as f:
-        all_images_exif_data[original].set("get_file", f.read())
-    with open(Path(images_directory) / "Annotated Photos" / annotated, "wb") as f:
-        if all_images_exif_data[original].get("pixel_x_dimension"):
-            all_images_exif_data[original].delete("pixel_x_dimension")
-        if all_images_exif_data[original].get("pixel_y_dimension"):
-            all_images_exif_data[original].delete("pixel_y_dimension")
-        f.write(all_images_exif_data[original].get_file)
-    # Finally update the original photo.
-    if configs["CAPTIONS"]["updateoriginals"] == "yes":
-        with open(Path(images_directory) / original, "wb") as f:
-            f.write(all_images_exif_data[original].get_file)
+        all_images_exif_data[original].delete("user_comment")
+    with open(Path(images_directory) / original, "wb") as f:
+        f.write(all_images_exif_data[original].get_file())
 
 
 def create_word_doc() -> None:
