@@ -86,10 +86,12 @@ def display_menu() -> str:
         valid_actions.append("2")
     csv_file = Path(images_directory) / "Photo Log.csv"
     if csv_file.is_file():
-        print(" 3 - Annotate Photos")
+        print(" 3 - Update Original Photos")
         valid_actions.append("3")
-        print(" 4 - Create Word Document")
+        print(" 4 - Create Annotated Photos")
         valid_actions.append("4")
+        print(" 5 - Create Contact Sheet")
+        valid_actions.append("5")
     print(" Q - Quit")
     valid_actions.append("Q")
     print("----------------------------")
@@ -158,23 +160,29 @@ def create_csv() -> None:
     ):
         view_csv_file(csv_file)
         main()
+    # Get defaults
     data_for_csv = []
     for each_image in all_images_exif_data:
         image_data = {"Photo": each_image}
+        image_data["Photographer"] = configs["DEFAULTS"]["photographer"]
+        image_data["Project"] = configs["DEFAULTS"]["project"]
+        image_data["Site"] = configs["DEFAULTS"]["site"]
+        if not configs["DEFAULTS"]["photographer"]:
+            try:
+                image_data["Photographer"] = all_images_exif_data[each_image].get(
+                    "artist"
+                )
+            except:
+                pass
         try:
-            image_data["Photographer"] = all_images_exif_data[each_image].get("artist")
-        except:
-            image_data["Photographer"] = ""
-        try:
-            timestamp = str(
+            image_data["Timestamp"] = str(
                 datetime.strptime(
                     all_images_exif_data[each_image].get("datetime_original"),
                     "%Y:%m:%d %H:%M:%S",
                 )
             )
         except:
-            timestamp = ""
-        image_data["Timestamp"] = timestamp
+            image_data["Timestamp"] = ""
         image_data["GPS Coordinates"] = parse_gps_coords(
             all_images_exif_data[each_image].get("gps_latitude"),
             all_images_exif_data[each_image].get("gps_longitude"),
@@ -205,6 +213,33 @@ def create_csv() -> None:
     main()
 
 
+def update_originals() -> None:
+    if not images_directory:
+        main()
+    csv_file = Path(images_directory) / "Photo Log.csv"
+    with open(csv_file, "r") as f:
+        reader = csv.DictReader(f)
+        for each_photo in reader:
+            # Update all_images_exif_data with the values from the CSV
+            if each_photo["Photographer"]:
+                all_images_exif_data[each_photo["Photo"]].set(
+                    "artist", each_photo["Photographer"]
+                )
+            caption = ""
+            if each_photo["Project"]:
+                caption = f"Project: {each_photo['Project']}. "
+            if each_photo["Site"]:
+                caption += f"Site: {each_photo['Site']}. "
+            caption += each_photo["Description"]
+            all_images_exif_data[each_photo["Photo"]].set("image_description", caption)
+            # Delete the Theodolite caption saved in the user_comment EXIF field
+            if all_images_exif_data[each_photo["Photo"]].get("user_comment"):
+                all_images_exif_data[each_photo["Photo"]].delete("user_comment")
+            with open(Path(images_directory) / each_photo["Photo"], "wb") as f:
+                f.write(all_images_exif_data[each_photo["Photo"]].get_file())
+    main()
+
+
 def annotate_photos() -> None:
     global all_images_exif_data
     if not images_directory:
@@ -224,22 +259,24 @@ def annotate_photos() -> None:
         for each_photo in reader:
             print(f"{i}: Annotating photo {each_photo['Photo']}")
             label = []
+            line = [each_photo["Photo"]]
+            if each_photo["Timestamp"]:
+                line.append(each_photo["Timestamp"])
+            label.append("   ".join(line))
             line = []
             if each_photo["Project"]:
                 line.append(f"Project: {each_photo['Project']}")
             if each_photo["Site"]:
                 line.append(f"Site: {each_photo['Site']}")
+            if each_photo["Description"]:
+                line.append(each_photo["Description"])
             if line:
                 label.append(".  ".join(line))
-            if each_photo["Description"]:
-                label.append(each_photo["Description"])
             line = []
             if each_photo["Facing"]:
                 line.append(f"Facing {each_photo['Facing']}")
             if each_photo["GPS Coordinates"]:
                 line.append(each_photo["GPS Coordinates"])
-            if each_photo["Timestamp"]:
-                line.append(each_photo["Timestamp"])
             if line:
                 label.append(".  ".join(line))
             if not label:
@@ -272,47 +309,14 @@ def annotate_photos() -> None:
                 progressive=True,
             )
             img.close()
-            if configs["CAPTIONS"]["updateoriginals"] == "yes":
-                update_original_image_exif_data(
-                    images_directory,
-                    each_photo["Photo"],  # original photo
-                    each_photo["Photographer"],
-                    each_photo["Project"],
-                    each_photo["Site"],
-                    each_photo["Description"],
-                )
             i += 1
     main()
-
-
-def update_original_image_exif_data(
-    images_directory: Path,
-    original: str,
-    photographer: str,
-    project: str,
-    site: str,
-    description: str,
-) -> None:
-    # Update all_images_exif_data with the values from the CSV
-    if photographer:
-        all_images_exif_data[original].set("artist", photographer)
-    caption = ""
-    if project:
-        caption = f"Project: {project}. "
-    if site:
-        caption += f"Site: {site}. "
-    caption += description
-    all_images_exif_data[original].set("image_description", caption)
-    # Delete the Theodolite caption saved in the user_comment EXIF field
-    if all_images_exif_data[original].get("user_comment"):
-        all_images_exif_data[original].delete("user_comment")
-    with open(Path(images_directory) / original, "wb") as f:
-        f.write(all_images_exif_data[original].get_file())
 
 
 def create_word_doc() -> None:
     # TODO: create Word doc
     print("Create Word Document isn’t implemented yet.")
+    main()
 
 
 def main() -> None:
@@ -323,15 +327,16 @@ def main() -> None:
             pass
     except:
         with open("configs.ini", "w") as f:
+            f.write("[DEFAULTS]\n")
+            f.write("photographer = \n")
+            f.write("project = \n")
+            f.write("site = \n\n")
             f.write("[FACING]\n")
             f.write("# options are:\n")
             f.write("#  'coarse' (N, NE, E, SE, S, SW, W, NW)\n")
             f.write("#  'fine' (N, NNE, NE, ENE, E, and so-on)\n")
             f.write("#  'precise' (the actual bearing, in degrees)\n")
-            f.write("precision = coarse\n\n")
-            f.write("[CAPTIONS]\n")
-            f.write("# write the edited captions back to the original images\n")
-            f.write("updateoriginals = yes")
+            f.write("precision = coarse\n")
     configs.read("configs.ini")
     action = ""
     while action not in valid_actions:
@@ -341,8 +346,10 @@ def main() -> None:
     elif action == "2":
         create_csv()
     elif action == "3":
-        annotate_photos()
+        update_originals()
     elif action == "4":
+        annotate_photos()
+    elif action == "5":
         create_word_doc()
     elif action == "Q":
         exit()
