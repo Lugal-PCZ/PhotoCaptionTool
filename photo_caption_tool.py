@@ -19,6 +19,9 @@ rotation = [1, 8, 3, 6]  # Rotation of images, as represented in EXIF
 valid_actions = []
 
 # TODO: rename the internal-only function definitions with single underscores
+# TODO: add paper size to the configs
+# TODO: make CSV and Word doc viewing their own menu items
+# TODO: force upper case for config variables
 
 
 def facing(azimuth) -> str:
@@ -88,14 +91,14 @@ def display_menu() -> str:
     if images_directory:
         print(" 2 - Create New Photo Log")
         valid_actions.append("2")
-    csv_file = Path(images_directory) / "Photo Log.csv"
-    if csv_file.is_file():
-        print(" 3 - Update Original Photos")
-        valid_actions.append("3")
-        print(" 4 - Create Annotated Photos")
-        valid_actions.append("4")
-        print(" 5 - Create Contact Sheet")
-        valid_actions.append("5")
+        csv_file = Path(images_directory) / "Photo Log.csv"
+        if csv_file.is_file():
+            print(" 3 - Update Original Photos")
+            valid_actions.append("3")
+            print(" 4 - Create Annotated Photos")
+            valid_actions.append("4")
+            print(" 5 - Create Contact Sheet")
+            valid_actions.append("5")
     print(" Q - Quit")
     valid_actions.append("Q")
     print("----------------------------")
