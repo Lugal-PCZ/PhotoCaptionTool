@@ -8,13 +8,17 @@ from datetime import datetime
 
 import exif
 from PIL import Image, ImageOps, ImageFont, ImageDraw
+from docx import Document
+from docx.shared import Mm
 
 
-configs = None
+configs = configparser.ConfigParser()
 images_directory = ""
 all_images_exif_data = {}
 rotation = [1, 8, 3, 6]  # Rotation of images, as represented in EXIF
 valid_actions = []
+
+# TODO: rename the internal-only function definitions with single underscores
 
 
 def facing(azimuth) -> str:
@@ -214,9 +218,9 @@ def create_csv() -> None:
 
 
 def update_originals() -> None:
-    if not images_directory:
-        main()
     csv_file = Path(images_directory) / "Photo Log.csv"
+    if not csv_file.is_file():
+        main()
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f)
         for each_photo in reader:
@@ -242,7 +246,8 @@ def update_originals() -> None:
 
 def annotate_photos() -> None:
     global all_images_exif_data
-    if not images_directory:
+    csv_file = Path(images_directory) / "Photo Log.csv"
+    if not csv_file.is_file():
         main()
     output_dir = Path(images_directory) / "Annotated Photos"
     if output_dir.is_dir():
@@ -252,12 +257,11 @@ def annotate_photos() -> None:
         ):
             main()
     output_dir.mkdir(exist_ok=True)
-    csv_file = Path(images_directory) / "Photo Log.csv"
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f)
         i = 1
         for each_photo in reader:
-            print(f"{i}: Annotating photo {each_photo['Photo']}")
+            print(f"{i}: Annotating photo {each_photo['Photo']}.")
             label = []
             line = [each_photo["Photo"]]
             if each_photo["Timestamp"]:
@@ -287,12 +291,12 @@ def annotate_photos() -> None:
             img = Image.open(Path(images_directory) / each_photo["Photo"])
             img = img.rotate(rotation.index(orientation) * 90, expand=True)
             img = ImageOps.pad(img, (img.width, img.height + 200), centering=(0, 0))
-            img_annotion = ImageDraw.Draw(img, mode="RGB")
+            img_annotation = ImageDraw.Draw(img, mode="RGB")
             try:
                 thefont = ImageFont.truetype("Helvetica.ttc", 46)
             except:
                 thefont = ImageFont.truetype("arial.ttf", 46)
-            img_annotion.text(
+            img_annotation.text(
                 (20, img.height - 180),
                 "\n".join(label),
                 font=thefont,
@@ -314,14 +318,41 @@ def annotate_photos() -> None:
 
 
 def create_word_doc() -> None:
-    # TODO: create Word doc
-    print("Create Word Document isn’t implemented yet.")
+    csv_file = Path(images_directory) / "Photo Log.csv"
+    if not csv_file.is_file():
+        main()
+    # Create a new Word document on A4 paper
+    document = Document()
+    section = document.sections[0]
+    section.page_height = Mm(297)
+    section.page_width = Mm(210)
+    section.left_margin = Mm(12)
+    section.right_margin = Mm(12)
+    section.top_margin = Mm(12)
+    section.bottom_margin = Mm(12)
+    csv_file = Path(images_directory) / "Photo Log.csv"
+    with open(csv_file, "r") as f:
+        reader = csv.DictReader(f)
+        i = 1
+        for each_photo in reader:
+            print(f"{i}: Adding photo {each_photo['Photo']} to contact sheet.")
+            document.add_picture(
+                str(Path(images_directory) / each_photo["Photo"]), width=Mm(150)
+            )
+            label = [each_photo["Photo"]]
+            if each_photo["Description"]:
+                label.append(each_photo["Description"])
+            if each_photo["Facing"]:
+                label.append(f"Facing {each_photo['Facing']}")
+            document.add_paragraph("\n".join(label))
+            i += 1
+    document.save(Path(images_directory) / "Contact Sheet.docx")
+    print("“Contact Sheet.docx” created.")
     main()
 
 
 def main() -> None:
     global configs
-    configs = configparser.ConfigParser()
     try:
         with open("configs.ini", "r") as f:
             pass
