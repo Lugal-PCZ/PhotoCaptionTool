@@ -9,7 +9,7 @@ from datetime import datetime
 import exif
 from PIL import Image, ImageOps, ImageFont, ImageDraw
 from docx import Document
-from docx.shared import Mm
+from docx.shared import Inches, Mm
 
 
 configs = configparser.ConfigParser()
@@ -18,14 +18,42 @@ all_images_exif_data = {}
 rotation = [1, 8, 3, 6]  # Rotation of images, as represented in EXIF
 valid_actions = []
 
-# TODO: rename the internal-only function definitions with single underscores
-# TODO: add paper size to the configs
-# TODO: make CSV and Word doc viewing their own menu items
-# TODO: force upper case for config variables
+
+def _display_menu() -> str:
+    global valid_actions
+    if images_directory:
+        print(f"\nPhotos Folder: {images_directory}")
+    else:
+        print(f"\nPhotos Folder: (not set)")
+    print("----------------------------")
+    print(" Choose an action:")
+    print(" 1 - Load Photos from Folder")
+    valid_actions = ["1"]
+    if images_directory:
+        print(" 2 - Create New Photo Log")
+        valid_actions.append("2")
+        csv_file = Path(images_directory) / "Photo Log.csv"
+        if csv_file.is_file():
+            print(" 3 - View CSV File")
+            valid_actions.append("3")
+            print(" 4 - Update Original Photos")
+            valid_actions.append("4")
+            print(" 5 - Create Annotated Photos")
+            valid_actions.append("5")
+            print(" 6 - Create Contact Sheet")
+            valid_actions.append("6")
+        word_doc = Path(images_directory) / "Contact Sheet.docx"
+        if word_doc.is_file():
+            print(" 7 - View Contact Sheet")
+            valid_actions.append("7")
+    print(" Q - Quit")
+    valid_actions.append("Q")
+    print("----------------------------")
+    return input().upper()
 
 
-def facing(azimuth) -> str:
-    if configs["FACING"]["precision"] == "coarse":
+def _facing(azimuth) -> str:
+    if configs["FACING"]["precision"].lower() == "coarse":
         increment = 22.5
         directions = [
             "N",
@@ -38,7 +66,7 @@ def facing(azimuth) -> str:
             "NW",
             "N",
         ]
-    elif configs["FACING"]["precision"] == "fine":
+    elif configs["FACING"]["precision"].lower() == "fine":
         increment = 11.25
         directions = [
             "N",
@@ -60,7 +88,7 @@ def facing(azimuth) -> str:
             "N",
         ]
     try:
-        if configs["FACING"]["precision"] == "precise":
+        if configs["FACING"]["precision"].lower() == "precise":
             bearing = f"{round(azimuth)}°"
         else:
             bearing = directions[math.ceil(math.floor((azimuth % 360) / increment) / 2)]
@@ -69,182 +97,13 @@ def facing(azimuth) -> str:
     return bearing
 
 
-def parse_gps_coords(lat, lon, ns, ew) -> str:
+def _parse_gps_coords(lat, lon, ns, ew) -> str:
     try:
         latitude = f"{int(lat[0])}°{int(lat[1])}'{int(lat[2])}\"{ns}"
         longitude = f"{int(lon[0])}°{int(lon[1])}'{int(lon[2])}\"{ew}"
         return f"{latitude} {longitude}"
     except:
         return ""
-
-
-def display_menu() -> str:
-    global valid_actions
-    if images_directory:
-        print(f"\nPhotos Folder: {images_directory}")
-    else:
-        print(f"\nPhotos Folder: (not set)")
-    print("----------------------------")
-    print(" Choose an action:")
-    print(" 1 - Load Photos from Folder")
-    valid_actions = ["1"]
-    if images_directory:
-        print(" 2 - Create New Photo Log")
-        valid_actions.append("2")
-        csv_file = Path(images_directory) / "Photo Log.csv"
-        if csv_file.is_file():
-            print(" 3 - Update Original Photos")
-            valid_actions.append("3")
-            print(" 4 - Create Annotated Photos")
-            valid_actions.append("4")
-            print(" 5 - Create Contact Sheet")
-            valid_actions.append("5")
-    print(" Q - Quit")
-    valid_actions.append("Q")
-    print("----------------------------")
-    return input().upper()
-
-
-def view_csv_file(csv_file) -> None:
-    if input("Type “Y” to open this file now. ").upper() == "Y":
-        try:
-            os.startfile(csv_file)
-        except:
-            os.system(f'open "{csv_file}"')
-
-
-def load_photos() -> None:
-    global images_directory
-    global all_images_exif_data
-    all_images_exif_data = {}
-    images_directory = (
-        input("Enter the Images Folder\n(type the path or drag the folder onto here): ")
-        .strip("'")
-        .strip('"')
-        .strip()
-    )
-    if "PosixPath" in str(type(Path())):
-        images_directory = images_directory.replace("\\", "")
-    if images_directory.startswith("~"):
-        images_directory = images_directory.replace("~", str(Path.home()), 1)
-    images = []
-    items = Path(images_directory).glob("*.*")
-    for each_item in items:
-        if re.match(".*\.jpe?g", each_item.name, flags=re.IGNORECASE):
-            images.append(each_item.name)
-            images.sort()
-    if len(images) == 0:
-        images_directory = ""
-        print("NOTICE: There were no valid JPEG images in the selected directory.")
-    else:
-        for each_image in images:
-            with open(Path(images_directory) / each_image, "rb") as f:
-                the_image = exif.Image(f)
-                all_images_exif_data[each_image] = the_image
-                if not all_images_exif_data[each_image].has_exif:
-                    all_images_exif_data[each_image].set("artist", "")
-    main()
-
-
-def create_csv() -> None:
-    headers = [
-        "Photo",
-        "Photographer",
-        "Project",
-        "Site",
-        "Timestamp",
-        "GPS Coordinates",
-        "Facing",
-        "Description",
-    ]
-    if not all_images_exif_data:
-        main()
-    csv_file = Path(images_directory) / "Photo Log.csv"
-    if (
-        csv_file.is_file()
-        and input(f"“{csv_file}” already exists. Type “Y” to overwrite it. ").upper()
-        != "Y"
-    ):
-        view_csv_file(csv_file)
-        main()
-    # Get defaults
-    data_for_csv = []
-    for each_image in all_images_exif_data:
-        image_data = {"Photo": each_image}
-        image_data["Photographer"] = configs["DEFAULTS"]["photographer"]
-        image_data["Project"] = configs["DEFAULTS"]["project"]
-        image_data["Site"] = configs["DEFAULTS"]["site"]
-        if not configs["DEFAULTS"]["photographer"]:
-            try:
-                image_data["Photographer"] = all_images_exif_data[each_image].get(
-                    "artist"
-                )
-            except:
-                pass
-        try:
-            image_data["Timestamp"] = str(
-                datetime.strptime(
-                    all_images_exif_data[each_image].get("datetime_original"),
-                    "%Y:%m:%d %H:%M:%S",
-                )
-            )
-        except:
-            image_data["Timestamp"] = ""
-        image_data["GPS Coordinates"] = parse_gps_coords(
-            all_images_exif_data[each_image].get("gps_latitude"),
-            all_images_exif_data[each_image].get("gps_longitude"),
-            all_images_exif_data[each_image].get("gps_latitude_ref"),
-            all_images_exif_data[each_image].get("gps_longitude_ref"),
-        )
-        image_data["Description"] = ""
-        # Photo taken with iOS Camera.app:
-        if all_images_exif_data[each_image].get("image_description"):
-            image_data["Description"] = (
-                all_images_exif_data[each_image].get("image_description").strip()
-            )
-        # Photo taken with Theodolite.app:
-        if all_images_exif_data[each_image].get("user_comment"):
-            image_data["Description"] = (
-                all_images_exif_data[each_image].get("user_comment").strip()
-            )
-        image_data["Facing"] = facing(
-            all_images_exif_data[each_image].get("gps_img_direction")
-        )
-        data_for_csv.append(image_data)
-    with open(csv_file, "w", newline="") as f:
-        csv_out = csv.DictWriter(f, fieldnames=headers)
-        csv_out.writeheader()
-        csv_out.writerows(data_for_csv)
-    print("“Photo Log.csv” created.")
-    view_csv_file(csv_file)
-    main()
-
-
-def update_originals() -> None:
-    csv_file = Path(images_directory) / "Photo Log.csv"
-    if not csv_file.is_file():
-        main()
-    with open(csv_file, "r") as f:
-        reader = csv.DictReader(f)
-        for each_photo in reader:
-            # Update all_images_exif_data with the values from the CSV
-            if each_photo["Photographer"]:
-                all_images_exif_data[each_photo["Photo"]].set(
-                    "artist", each_photo["Photographer"]
-                )
-            caption = ""
-            if each_photo["Project"]:
-                caption = f"Project: {each_photo['Project']}. "
-            if each_photo["Site"]:
-                caption += f"Site: {each_photo['Site']}. "
-            caption += each_photo["Description"]
-            all_images_exif_data[each_photo["Photo"]].set("image_description", caption)
-            # Delete the Theodolite caption saved in the user_comment EXIF field
-            if all_images_exif_data[each_photo["Photo"]].get("user_comment"):
-                all_images_exif_data[each_photo["Photo"]].delete("user_comment")
-            with open(Path(images_directory) / each_photo["Photo"], "wb") as f:
-                f.write(all_images_exif_data[each_photo["Photo"]].get_file())
-    main()
 
 
 def annotate_photos() -> None:
@@ -320,6 +179,79 @@ def annotate_photos() -> None:
     main()
 
 
+def create_csv() -> None:
+    headers = [
+        "Photo",
+        "Photographer",
+        "Project",
+        "Site",
+        "Timestamp",
+        "GPS Coordinates",
+        "Facing",
+        "Description",
+    ]
+    if not all_images_exif_data:
+        main()
+    csv_file = Path(images_directory) / "Photo Log.csv"
+    if (
+        csv_file.is_file()
+        and input(f"“{csv_file}” already exists. Type “Y” to overwrite it. ").upper()
+        != "Y"
+    ):
+        main()
+    # Get defaults
+    data_for_csv = []
+    for each_image in all_images_exif_data:
+        image_data = {"Photo": each_image}
+        image_data["Photographer"] = configs["DEFAULTS"]["photographer"]
+        image_data["Project"] = configs["DEFAULTS"]["project"]
+        image_data["Site"] = configs["DEFAULTS"]["site"]
+        if not configs["DEFAULTS"]["photographer"]:
+            try:
+                image_data["Photographer"] = all_images_exif_data[each_image].get(
+                    "artist"
+                )
+            except:
+                pass
+        try:
+            image_data["Timestamp"] = str(
+                datetime.strptime(
+                    all_images_exif_data[each_image].get("datetime_original"),
+                    "%Y:%m:%d %H:%M:%S",
+                )
+            )
+        except:
+            image_data["Timestamp"] = ""
+        image_data["GPS Coordinates"] = _parse_gps_coords(
+            all_images_exif_data[each_image].get("gps_latitude"),
+            all_images_exif_data[each_image].get("gps_longitude"),
+            all_images_exif_data[each_image].get("gps_latitude_ref"),
+            all_images_exif_data[each_image].get("gps_longitude_ref"),
+        )
+        image_data["Description"] = ""
+        # Photo taken with iOS Camera.app:
+        if all_images_exif_data[each_image].get("image_description"):
+            image_data["Description"] = (
+                all_images_exif_data[each_image].get("image_description").strip()
+            )
+        # Photo taken with Theodolite.app:
+        if all_images_exif_data[each_image].get("user_comment"):
+            image_data["Description"] = (
+                all_images_exif_data[each_image].get("user_comment").strip()
+            )
+        image_data["Facing"] = _facing(
+            all_images_exif_data[each_image].get("gps_img_direction")
+        )
+        data_for_csv.append(image_data)
+    with open(csv_file, "w", newline="") as f:
+        csv_out = csv.DictWriter(f, fieldnames=headers)
+        csv_out.writeheader()
+        csv_out.writerows(data_for_csv)
+    print("“Photo Log.csv” created.")
+    view_csv_file(csv_file)
+    main()
+
+
 def create_word_doc() -> None:
     csv_file = Path(images_directory) / "Photo Log.csv"
     if not csv_file.is_file():
@@ -327,12 +259,22 @@ def create_word_doc() -> None:
     # Create a new Word document on A4 paper
     document = Document()
     section = document.sections[0]
-    section.page_height = Mm(297)
-    section.page_width = Mm(210)
-    section.left_margin = Mm(12)
-    section.right_margin = Mm(12)
-    section.top_margin = Mm(12)
-    section.bottom_margin = Mm(12)
+    if configs["DEFAULTS"]["papersize"].lower() == "a4":
+        section.page_height = Mm(297)
+        section.page_width = Mm(210)
+        section.left_margin = Mm(12)
+        section.right_margin = Mm(12)
+        section.top_margin = Mm(12)
+        section.bottom_margin = Mm(12)
+        photowidth = Mm(100)
+    elif configs["DEFAULTS"]["papersize"].lower() == "letter":
+        section.page_height = Inches(11)
+        section.page_width = Inches(8.5)
+        section.left_margin = Inches(0.5)
+        section.right_margin = Inches(0.5)
+        section.top_margin = Inches(0.5)
+        section.bottom_margin = Inches(0.5)
+        photowidth = Inches(4)
     csv_file = Path(images_directory) / "Photo Log.csv"
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f)
@@ -340,7 +282,7 @@ def create_word_doc() -> None:
         for each_photo in reader:
             print(f"{i}: Adding photo {each_photo['Photo']} to contact sheet.")
             document.add_picture(
-                str(Path(images_directory) / each_photo["Photo"]), width=Mm(150)
+                str(Path(images_directory) / each_photo["Photo"]), width=photowidth
             )
             label = [each_photo["Photo"]]
             if each_photo["Description"]:
@@ -354,6 +296,84 @@ def create_word_doc() -> None:
     main()
 
 
+def load_photos() -> None:
+    global images_directory
+    global all_images_exif_data
+    all_images_exif_data = {}
+    images_directory = (
+        input("Enter the Images Folder\n(type the path or drag the folder onto here): ")
+        .strip("'")
+        .strip('"')
+        .strip()
+    )
+    if "PosixPath" in str(type(Path())):
+        images_directory = images_directory.replace("\\", "")
+    if images_directory.startswith("~"):
+        images_directory = images_directory.replace("~", str(Path.home()), 1)
+    images = []
+    items = Path(images_directory).glob("*.*")
+    for each_item in items:
+        if re.match(".*\.jpe?g", each_item.name, flags=re.IGNORECASE):
+            images.append(each_item.name)
+            images.sort()
+    if len(images) == 0:
+        images_directory = ""
+        print("NOTICE: There were no valid JPEG images in the selected directory.")
+    else:
+        for each_image in images:
+            with open(Path(images_directory) / each_image, "rb") as f:
+                the_image = exif.Image(f)
+                all_images_exif_data[each_image] = the_image
+                if not all_images_exif_data[each_image].has_exif:
+                    all_images_exif_data[each_image].set("artist", "")
+    main()
+
+
+def update_originals() -> None:
+    csv_file = Path(images_directory) / "Photo Log.csv"
+    if not csv_file.is_file():
+        main()
+    with open(csv_file, "r") as f:
+        reader = csv.DictReader(f)
+        for each_photo in reader:
+            # Update all_images_exif_data with the values from the CSV
+            if each_photo["Photographer"]:
+                all_images_exif_data[each_photo["Photo"]].set(
+                    "artist", each_photo["Photographer"]
+                )
+            caption = ""
+            if each_photo["Project"]:
+                caption = f"Project: {each_photo['Project']}. "
+            if each_photo["Site"]:
+                caption += f"Site: {each_photo['Site']}. "
+            caption += each_photo["Description"]
+            all_images_exif_data[each_photo["Photo"]].set("image_description", caption)
+            # Delete the Theodolite caption saved in the user_comment EXIF field
+            if all_images_exif_data[each_photo["Photo"]].get("user_comment"):
+                all_images_exif_data[each_photo["Photo"]].delete("user_comment")
+            with open(Path(images_directory) / each_photo["Photo"], "wb") as f:
+                f.write(all_images_exif_data[each_photo["Photo"]].get_file())
+    main()
+
+
+def view_csv_file() -> None:
+    thefile = Path(images_directory) / "Photo Log.csv"
+    try:
+        os.startfile(thefile)
+    except:
+        os.system(f'open "{thefile}"')
+    main()
+
+
+def view_word_doc() -> None:
+    thefile = Path(images_directory) / "Contact Sheet.docx"
+    try:
+        os.startfile(thefile)
+    except:
+        os.system(f'open "{thefile}"')
+    main()
+
+
 def main() -> None:
     global configs
     try:
@@ -362,11 +382,13 @@ def main() -> None:
     except:
         with open("configs.ini", "w") as f:
             f.write("[DEFAULTS]\n")
+            f.write("# papersize options are 'a4' and 'letter'\n")
+            f.write("papersize = a4\n")
             f.write("photographer = \n")
             f.write("project = \n")
             f.write("site = \n\n")
             f.write("[FACING]\n")
-            f.write("# options are:\n")
+            f.write("# precision options are:\n")
             f.write("#  'coarse' (N, NE, E, SE, S, SW, W, NW)\n")
             f.write("#  'fine' (N, NNE, NE, ENE, E, and so-on)\n")
             f.write("#  'precise' (the actual bearing, in degrees)\n")
@@ -374,17 +396,21 @@ def main() -> None:
     configs.read("configs.ini")
     action = ""
     while action not in valid_actions:
-        action = display_menu()
+        action = _display_menu()
     if action == "1":
         load_photos()
     elif action == "2":
         create_csv()
     elif action == "3":
-        update_originals()
+        view_csv_file()
     elif action == "4":
-        annotate_photos()
+        update_originals()
     elif action == "5":
+        annotate_photos()
+    elif action == "6":
         create_word_doc()
+    elif action == "7":
+        view_word_doc()
     elif action == "Q":
         exit()
 
