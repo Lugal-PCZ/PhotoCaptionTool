@@ -248,7 +248,6 @@ def create_csv() -> None:
         csv_out.writeheader()
         csv_out.writerows(data_for_csv)
     print("“Photo Log.csv” created.")
-    view_csv_file(csv_file)
     main()
 
 
