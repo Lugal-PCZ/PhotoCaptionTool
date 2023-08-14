@@ -255,6 +255,13 @@ def create_word_doc() -> None:
     csv_file = Path(images_directory) / "Photo Log.csv"
     if not csv_file.is_file():
         main()
+    word_doc = Path(images_directory) / "Contact Sheet.docx"
+    if (
+        word_doc.is_file()
+        and input(f"“{word_doc}” already exists. Type “Y” to overwrite it. ").upper()
+        != "Y"
+    ):
+        main()
     # Create a new Word document on A4 paper
     document = Document()
     section = document.sections[0]
@@ -274,7 +281,6 @@ def create_word_doc() -> None:
         section.top_margin = Inches(0.5)
         section.bottom_margin = Inches(0.5)
         photowidth = Inches(4)
-    csv_file = Path(images_directory) / "Photo Log.csv"
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f)
         i = 1
@@ -290,7 +296,7 @@ def create_word_doc() -> None:
                 label.append(f"Facing {each_photo['Facing']}")
             document.add_paragraph("\n".join(label))
             i += 1
-    document.save(Path(images_directory) / "Contact Sheet.docx")
+    document.save(word_doc)
     print("“Contact Sheet.docx” created.")
     main()
 
@@ -331,6 +337,13 @@ def load_photos() -> None:
 def update_originals() -> None:
     csv_file = Path(images_directory) / "Photo Log.csv"
     if not csv_file.is_file():
+        main()
+    if (
+        input(
+            f"WARNING:\nUpdating the original photos with the contents of “Photo Log.csv” has the potential for data loss. Type “Y” to proceed. "
+        ).upper()
+        != "Y"
+    ):
         main()
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f)
