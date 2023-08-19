@@ -3,10 +3,9 @@ import csv
 import math
 import os
 import re
+import subprocess
 from pathlib import Path
-from datetime import datetime
 
-import exif
 from PIL import Image, ImageOps, ImageFont, ImageDraw
 from docx import Document
 from docx.shared import Inches, Mm
@@ -15,7 +14,7 @@ from docx.shared import Inches, Mm
 configs = configparser.ConfigParser()
 images_directory = ""
 all_images_exif_data = {}
-rotation = [1, 8, 3, 6]  # Rotation of images, as represented in EXIF
+rotation = ["1", "8", "3", "6"]  # Rotation of images, as represented in EXIF
 valid_actions = []
 
 
@@ -88,6 +87,7 @@ def _facing(azimuth) -> str:
             "N",
         ]
     try:
+        azimuth = float(azimuth)
         if configs["FACING"]["precision"].lower() == "precise":
             bearing = f"{round(azimuth)}°"
         else:
@@ -95,15 +95,6 @@ def _facing(azimuth) -> str:
     except:
         bearing = ""
     return bearing
-
-
-def _parse_gps_coords(lat, lon, ns, ew) -> str:
-    try:
-        latitude = f"{int(lat[0])}°{int(lat[1])}'{int(lat[2])}\"{ns}"
-        longitude = f"{int(lon[0])}°{int(lon[1])}'{int(lon[2])}\"{ew}"
-        return f"{latitude} {longitude}"
-    except:
-        return ""
 
 
 def annotate_photos() -> None:
@@ -147,9 +138,9 @@ def annotate_photos() -> None:
                 label.append(".  ".join(line))
             if not label:
                 label = ["(unlabeled)"]
-            orientation = all_images_exif_data[each_photo["Photo"]].get("orientation")
+            orientation = all_images_exif_data[each_photo["Photo"]]["orientation"]
             if not orientation:
-                orientation = 1
+                orientation = "1"
             img = Image.open(Path(images_directory) / each_photo["Photo"])
             img = img.rotate(rotation.index(orientation) * 90, expand=True)
             img = ImageOps.pad(img, (img.width, img.height + 200), centering=(0, 0))
@@ -199,7 +190,6 @@ def create_csv() -> None:
         != "Y"
     ):
         main()
-    # Get defaults
     data_for_csv = []
     for each_image in all_images_exif_data:
         image_data = {"Photo": each_image}
@@ -207,40 +197,30 @@ def create_csv() -> None:
         image_data["Project"] = configs["DEFAULTS"]["project"]
         image_data["Site"] = configs["DEFAULTS"]["site"]
         if not configs["DEFAULTS"]["photographer"]:
-            try:
-                image_data["Photographer"] = all_images_exif_data[each_image].get(
-                    "artist"
-                )
-            except:
-                pass
-        try:
-            image_data["Timestamp"] = str(
-                datetime.strptime(
-                    all_images_exif_data[each_image].get("datetime_original"),
-                    "%Y:%m:%d %H:%M:%S",
-                )
-            )
-        except:
-            image_data["Timestamp"] = ""
-        image_data["GPS Coordinates"] = _parse_gps_coords(
-            all_images_exif_data[each_image].get("gps_latitude"),
-            all_images_exif_data[each_image].get("gps_longitude"),
-            all_images_exif_data[each_image].get("gps_latitude_ref"),
-            all_images_exif_data[each_image].get("gps_longitude_ref"),
-        )
+            photographer = []
+            if all_images_exif_data[each_image]["artist"]:
+                photographer.append(all_images_exif_data[each_image]["artist"])
+            if (
+                all_images_exif_data[each_image]["creator"]
+                and all_images_exif_data[each_image]["creator"] != photographer[0]
+            ):
+                photographer.append(all_images_exif_data[each_image]["creator"])
+            image_data["Photographer"] = ", ".join(photographer)
+        image_data["Timestamp"] = all_images_exif_data[each_image]["datetimeoriginal"]
+        image_data["GPS Coordinates"] = all_images_exif_data[each_image]["gpsposition"]
         image_data["Description"] = ""
         # Photo taken with iOS Camera.app:
-        if all_images_exif_data[each_image].get("image_description"):
-            image_data["Description"] = (
-                all_images_exif_data[each_image].get("image_description").strip()
-            )
+        if all_images_exif_data[each_image]["imagedescription"]:
+            image_data["Description"] = all_images_exif_data[each_image][
+                "imagedescription"
+            ].strip()
         # Photo taken with Theodolite.app:
-        if all_images_exif_data[each_image].get("user_comment"):
-            image_data["Description"] = (
-                all_images_exif_data[each_image].get("user_comment").strip()
-            )
+        if all_images_exif_data[each_image]["usercomment"]:
+            image_data["Description"] = all_images_exif_data[each_image][
+                "usercomment"
+            ].strip()
         image_data["Facing"] = _facing(
-            all_images_exif_data[each_image].get("gps_img_direction")
+            all_images_exif_data[each_image]["gpsimgdirection"]
         )
         data_for_csv.append(image_data)
     with open(csv_file, "w", newline="") as f:
@@ -325,12 +305,39 @@ def load_photos() -> None:
         images_directory = ""
         print("NOTICE: There were no valid JPEG images in the selected directory.")
     else:
+        tags = [
+            "-datetimeoriginal",
+            "-artist",
+            "-creator",
+            "-imagedescription",
+            "-usercomment",
+            "-gpsposition",
+            "-gpsimgdirection",
+            "-orientation#",
+        ]
         for each_image in images:
-            with open(Path(images_directory) / each_image, "rb") as f:
-                the_image = exif.Image(f)
-                all_images_exif_data[each_image] = the_image
-                if not all_images_exif_data[each_image].has_exif:
-                    all_images_exif_data[each_image].set("artist", "")
+            exif_data = (
+                subprocess.run(
+                    [
+                        Path(configs["DEFAULTS"]["exiftool"]),
+                        "-T",
+                        "-c",
+                        "%d°%d'%.2f\"",
+                        *tags,
+                        Path(images_directory) / each_image,
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                .stdout.strip()
+                .split("\t")
+            )
+            all_images_exif_data[each_image] = dict(
+                zip(
+                    [x.strip("-").strip("#") for x in tags],
+                    ["" if x == "-" else x for x in exif_data],
+                )
+            )
     main()
 
 
@@ -338,33 +345,24 @@ def update_originals() -> None:
     csv_file = Path(images_directory) / "Photo Log.csv"
     if not csv_file.is_file():
         main()
-    if (
-        input(
-            f"WARNING:\nUpdating the original photos with the contents of “Photo Log.csv” has the potential for data loss. Type “Y” to proceed. "
-        ).upper()
-        != "Y"
-    ):
-        main()
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f)
         for each_photo in reader:
-            # Update all_images_exif_data with the values from the CSV
-            if each_photo["Photographer"]:
-                all_images_exif_data[each_photo["Photo"]].set(
-                    "artist", each_photo["Photographer"]
-                )
             caption = ""
             if each_photo["Project"]:
                 caption = f"Project: {each_photo['Project']}. "
             if each_photo["Site"]:
                 caption += f"Site: {each_photo['Site']}. "
             caption += each_photo["Description"]
-            all_images_exif_data[each_photo["Photo"]].set("image_description", caption)
-            # Delete the Theodolite caption saved in the user_comment EXIF field
-            if all_images_exif_data[each_photo["Photo"]].get("user_comment"):
-                all_images_exif_data[each_photo["Photo"]].delete("user_comment")
-            with open(Path(images_directory) / each_photo["Photo"], "wb") as f:
-                f.write(all_images_exif_data[each_photo["Photo"]].get_file())
+            subprocess.run(
+                [
+                    "exiftool",
+                    f"-artist={each_photo['Photographer']}",
+                    f"-imagedescription={caption}",
+                    "--usercomment",
+                    Path(images_directory) / each_photo["Photo"],
+                ]
+            )
     main()
 
 
@@ -394,6 +392,7 @@ def main() -> None:
     except:
         with open("configs.ini", "w") as f:
             f.write("[DEFAULTS]\n")
+            f.write("exiftool = /usr/local/bin/exiftool\n")
             f.write("# papersize options are 'a4' and 'letter'\n")
             f.write("papersize = a4\n")
             f.write("photographer = \n")
@@ -406,6 +405,11 @@ def main() -> None:
             f.write("#  'precise' (the actual bearing, in degrees)\n")
             f.write("precision = coarse\n")
     configs.read("configs.ini")
+    exiftool = Path(configs["DEFAULTS"]["exiftool"])
+    if not exiftool.is_file():
+        exit(
+            "EXITING:\nexiftool not found at the location indicated in the configs.ini file. Install it (https://exiftool.org) or update its path to use this script."
+        )
     action = ""
     while action not in valid_actions:
         action = _display_menu()

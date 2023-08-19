@@ -1,3 +1,2 @@
-exif
 pillow
 python-docx
