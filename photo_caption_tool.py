@@ -29,21 +29,21 @@ def _display_menu() -> str:
     print(" 1 - Load Photos from Folder")
     valid_actions = ["1"]
     if images_directory:
+        csv_file = Path(images_directory) / "Photo Log.csv"
+        word_doc = Path(images_directory) / "Contact Sheet.docx"
         print(" 2 - Create New Photo Log")
         valid_actions.append("2")
-        csv_file = Path(images_directory) / "Photo Log.csv"
         if csv_file.is_file():
             print(" 3 - View CSV File")
             valid_actions.append("3")
-            print(" 4 - Update Original Photos")
+            print(" 4 - Create Annotated Photos")
             valid_actions.append("4")
-            print(" 5 - Create Annotated Photos")
+            print(" 5 - Create Contact Sheet")
             valid_actions.append("5")
-            print(" 6 - Create Contact Sheet")
-            valid_actions.append("6")
-        word_doc = Path(images_directory) / "Contact Sheet.docx"
-        if word_doc.is_file():
-            print(" 7 - View Contact Sheet")
+            if word_doc.is_file():
+                print(" 6 - View Contact Sheet")
+                valid_actions.append("6")
+            print(" 7 - Update Original Photos")
             valid_actions.append("7")
     print(" Q - Quit")
     valid_actions.append("Q")
@@ -420,13 +420,13 @@ def main() -> None:
     elif action == "3":
         view_csv_file()
     elif action == "4":
-        update_originals()
-    elif action == "5":
         annotate_photos()
-    elif action == "6":
+    elif action == "5":
         create_word_doc()
-    elif action == "7":
+    elif action == "6":
         view_word_doc()
+    elif action == "7":
+        update_originals()
     elif action == "Q":
         exit()
 
