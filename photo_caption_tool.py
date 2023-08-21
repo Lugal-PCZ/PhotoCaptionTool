@@ -252,7 +252,7 @@ def create_word_doc() -> None:
         section.right_margin = Mm(12)
         section.top_margin = Mm(12)
         section.bottom_margin = Mm(12)
-        photowidth = Mm(100)
+        photowidth = Mm(90)
     elif configs["DEFAULTS"]["papersize"].lower() == "letter":
         section.page_height = Inches(11)
         section.page_width = Inches(8.5)
@@ -260,7 +260,7 @@ def create_word_doc() -> None:
         section.right_margin = Inches(0.5)
         section.top_margin = Inches(0.5)
         section.bottom_margin = Inches(0.5)
-        photowidth = Inches(4)
+        photowidth = Inches(3.5)
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f)
         i = 1
