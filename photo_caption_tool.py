@@ -359,6 +359,8 @@ def update_originals() -> None:
                     "exiftool",
                     f"-artist={each_photo['Photographer']}",
                     f"-imagedescription={caption}",
+                    f"-caption-abstract={caption}",
+                    f"-description={caption}",
                     "--usercomment",
                     Path(images_directory) / each_photo["Photo"],
                 ]
