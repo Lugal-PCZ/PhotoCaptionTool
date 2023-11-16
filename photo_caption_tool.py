@@ -303,7 +303,7 @@ def load_photos() -> None:
             images.sort()
     if len(images) == 0:
         images_directory = ""
-        print("NOTICE: There were no valid JPEG images in the selected directory.")
+        print("\nNOTICE: There were no valid JPEG images in the selected directory.")
     else:
         tags = [
             "-datetimeoriginal",
