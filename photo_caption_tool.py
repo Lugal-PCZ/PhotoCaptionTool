@@ -2,6 +2,7 @@ import configparser
 import csv
 import math
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -309,7 +310,9 @@ def load_photos() -> None:
     images = []
     items = Path(images_directory).glob("*.*")
     for each_item in items:
-        if re.match(".*\.jpe?g", each_item.name, flags=re.IGNORECASE):
+        if each_item.name[0] != "." and re.match(
+            r".*\.jpe?g", each_item.name, flags=re.IGNORECASE
+        ):
             images.append(each_item.name)
             images.sort()
     if len(images) == 0:
@@ -330,7 +333,7 @@ def load_photos() -> None:
             exif_data = (
                 subprocess.run(
                     [
-                        Path(configs["DEFAULTS"]["exiftool"]),
+                        Path(configs["EXIFTOOL"]["exiftool"]),
                         "-T",
                         "-c",
                         "%d°%d'%.2f\"",
@@ -431,8 +434,20 @@ def main() -> None:
             pass
     except:
         with open("configs.ini", "w") as f:
+            f.write("[EXIFTOOL]\n")
+            if platform.system() == "Linux":
+                f.write("# Linux standard location of exiftool in $PATH\n")
+                f.write("exiftool = exiftool\n")
+            elif platform.system() == "Darwin":
+                f.write("# MacOS standard location of exiftool\n")
+                f.write("exiftool = /usr/local/bin/exiftool\n")
+            elif platform.system() == "Windows":
+                f.write(
+                    "# Windows recommended location of exiftool in PhotoCaptionTool folder\n"
+                )
+                f.write(";exiftool = exiftool.exe\n")
+            f.write("\n")
             f.write("[DEFAULTS]\n")
-            f.write("exiftool = /usr/local/bin/exiftool\n")
             f.write("# papersize options are 'a4' and 'letter'\n")
             f.write("papersize = a4\n")
             f.write("photographer = \n")
@@ -445,7 +460,7 @@ def main() -> None:
             f.write("#  'precise' (the actual bearing, in degrees)\n")
             f.write("precision = coarse\n")
     configs.read("configs.ini")
-    exiftool = Path(configs["DEFAULTS"]["exiftool"])
+    exiftool = Path(configs["EXIFTOOL"]["exiftool"])
     if not exiftool.is_file():
         exit(
             "EXITING:\nexiftool not found at the location indicated in the configs.ini file. Install it (https://exiftool.org) or update its path to use this script."
