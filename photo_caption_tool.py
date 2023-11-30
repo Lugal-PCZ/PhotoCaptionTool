@@ -445,7 +445,7 @@ def main() -> None:
                 f.write(
                     "# Windows recommended location of exiftool in PhotoCaptionTool folder\n"
                 )
-                f.write(";exiftool = exiftool.exe\n")
+                f.write("exiftool = exiftool.exe\n")
             f.write("\n")
             f.write("[DEFAULTS]\n")
             f.write("# papersize options are 'a4' and 'letter'\n")
