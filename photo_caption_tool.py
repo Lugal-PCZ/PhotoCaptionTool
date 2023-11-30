@@ -356,7 +356,7 @@ def load_photos() -> None:
                 bad_photos.append(each_image)
         if bad_photos:
             print(
-                "The following photos couldn’t be read. They probably have unicode characters in their file names."
+                "\nNOTICE: The following photos couldn’t be read. They probably have unicode characters in their file names."
             )
             for each_bad_photo in bad_photos:
                 print(f" - {each_bad_photo}")
