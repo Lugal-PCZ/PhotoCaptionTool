@@ -319,6 +319,7 @@ def load_photos() -> None:
         images_directory = ""
         print("\nNOTICE: There were no valid JPEG images in the selected directory.")
     else:
+        bad_photos = []
         tags = [
             "-datetimeoriginal",
             "-artist",
@@ -330,28 +331,35 @@ def load_photos() -> None:
             "-orientation#",
         ]
         for each_image in images:
-            exif_data = (
-                subprocess.run(
-                    [
-                        Path(configs["EXIFTOOL"]["exiftool"]),
-                        "-T",
-                        "-c",
-                        "%d°%d'%.2f\"",
-                        *tags,
-                        Path(images_directory) / each_image,
-                    ],
-                    capture_output=True,
-                    text=True,
-                )
-                .stdout.strip()
-                .split("\t")
+            exif_data = subprocess.run(
+                [
+                    Path(configs["EXIFTOOL"]["exiftool"]),
+                    "-T",
+                    "-c",
+                    "%d°%d'%.2f\"",
+                    *tags,
+                    Path(images_directory) / each_image,
+                ],
+                capture_output=True,
+                text=True,
             )
-            all_images_exif_data[each_image] = dict(
-                zip(
-                    [x.strip("-").strip("#") for x in tags],
-                    ["" if x == "-" else x for x in exif_data],
+            if exif_data.returncode == 0:
+                exif_data = exif_data.stdout.strip().split("\t")
+                all_images_exif_data[each_image] = dict(
+                    zip(
+                        [x.strip("-").strip("#") for x in tags],
+                        ["" if x == "-" else x for x in exif_data],
+                    )
                 )
+            else:
+                # Windows will cause exiftool to choke on unicode characters in the file name.
+                bad_photos.append(each_image)
+        if bad_photos:
+            print(
+                "The following photos couldn’t be read. They probably have unicode characters in their file names."
             )
+            for each_bad_photo in bad_photos:
+                print(f" - {each_bad_photo}")
     main()
 
 
