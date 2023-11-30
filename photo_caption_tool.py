@@ -3,6 +3,7 @@ import csv
 import math
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -36,15 +37,17 @@ def _display_menu() -> str:
         if csv_file.is_file():
             print(" 3 - View CSV File")
             valid_actions.append("3")
-            print(" 4 - Create Annotated Photos")
+            print(" 4 - Rename Photos")
             valid_actions.append("4")
-            print(" 5 - Create Contact Sheet")
+            print(" 5 - Create Annotated Photos")
             valid_actions.append("5")
+            print(" 6 - Create Contact Sheet")
+            valid_actions.append("6")
             if word_doc.is_file():
-                print(" 6 - View Contact Sheet")
-                valid_actions.append("6")
-            print(" 7 - Update Original Photos")
-            valid_actions.append("7")
+                print(" 7 - View Contact Sheet")
+                valid_actions.append("7")
+            print(" 8 - Update Original Photos")
+            valid_actions.append("8")
     print(" Q - Quit")
     valid_actions.append("Q")
     print("----------------------------")
@@ -110,13 +113,16 @@ def annotate_photos() -> None:
         ):
             main()
     output_dir.mkdir(exist_ok=True)
+    rename_the_annotated_photos = False
+    if (input(f"Type “Y” to rename the annotated photos. ")).upper() == "Y":
+        rename_the_annotated_photos = True
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f)
         i = 1
         for each_photo in reader:
             print(f"{i}: Annotating photo {each_photo['Photo']}.")
             label = []
-            line = [each_photo["Photo"]]
+            line = [f"Original Photo: {each_photo['Photo']}"]
             if each_photo["Timestamp"]:
                 line.append(each_photo["Timestamp"])
             label.append("   ".join(line))
@@ -158,6 +164,8 @@ def annotate_photos() -> None:
             )
             filename = each_photo["Photo"].split(".")
             filename[-2] = f"{filename[-2]}_Annotated"
+            if rename_the_annotated_photos and each_photo["Subject"]:
+                filename[-2] = f"{each_photo['Subject']} -- {filename[-2]}"
             filename = ".".join(filename)
             img.save(
                 Path(output_dir) / filename,
@@ -179,6 +187,7 @@ def create_csv() -> None:
         "Timestamp",
         "GPS Coordinates",
         "Facing",
+        "Subject",
         "Description",
     ]
     if not all_images_exif_data:
@@ -208,6 +217,9 @@ def create_csv() -> None:
             image_data["Photographer"] = ", ".join(photographer)
         image_data["Timestamp"] = all_images_exif_data[each_image]["datetimeoriginal"]
         image_data["GPS Coordinates"] = all_images_exif_data[each_image]["gpsposition"]
+        image_data["Facing"] = _facing(
+            all_images_exif_data[each_image]["gpsimgdirection"]
+        )
         image_data["Description"] = ""
         # Photo taken with iOS Camera.app:
         if all_images_exif_data[each_image]["imagedescription"]:
@@ -219,9 +231,7 @@ def create_csv() -> None:
             image_data["Description"] = all_images_exif_data[each_image][
                 "usercomment"
             ].strip()
-        image_data["Facing"] = _facing(
-            all_images_exif_data[each_image]["gpsimgdirection"]
-        )
+        image_data["Subject"] = image_data["Description"].split(".")[0]
         data_for_csv.append(image_data)
     with open(csv_file, "w", newline="") as f:
         csv_out = csv.DictWriter(f, fieldnames=headers)
@@ -267,7 +277,8 @@ def create_word_doc() -> None:
         for each_photo in reader:
             print(f"{i}: Adding photo {each_photo['Photo']} to contact sheet.")
             document.add_picture(
-                str(Path(images_directory) / each_photo["Photo"]), width=photowidth
+                str(Path(images_directory) / each_photo["Photo"]),
+                width=photowidth,
             )
             label = [each_photo["Photo"]]
             if each_photo["Description"]:
@@ -337,6 +348,33 @@ def load_photos() -> None:
                     [x.strip("-").strip("#") for x in tags],
                     ["" if x == "-" else x for x in exif_data],
                 )
+            )
+    main()
+
+
+def rename_photos() -> None:
+    csv_file = Path(images_directory) / "Photo Log.csv"
+    if not csv_file.is_file():
+        main()
+    output_dir = Path(images_directory) / "Renamed Photos"
+    if output_dir.is_dir():
+        if (
+            input(f"“{output_dir}” already exists. Type “Y” to overwrite it. ").upper()
+            != "Y"
+        ):
+            main()
+    output_dir.mkdir(exist_ok=True)
+    with open(csv_file, "r") as f:
+        reader = csv.DictReader(f)
+        i = 1
+        for each_photo in reader:
+            print(f"{i}: Renaming photo {each_photo['Photo']}.")
+            new_photo_name = each_photo["Photo"]
+            if each_photo["Subject"]:
+                new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photo']}"
+            shutil.copy2(
+                Path(images_directory) / each_photo["Photo"],
+                output_dir / new_photo_name,
             )
     main()
 
@@ -422,12 +460,14 @@ def main() -> None:
     elif action == "3":
         view_csv_file()
     elif action == "4":
-        annotate_photos()
+        rename_photos()
     elif action == "5":
-        create_word_doc()
+        annotate_photos()
     elif action == "6":
-        view_word_doc()
+        create_word_doc()
     elif action == "7":
+        view_word_doc()
+    elif action == "8":
         update_originals()
     elif action == "Q":
         exit()
