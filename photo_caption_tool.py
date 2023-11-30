@@ -55,7 +55,7 @@ def _display_menu() -> str:
     return input().upper()
 
 
-def _facing(azimuth) -> str:
+def _facing(azimuth: str) -> str:
     if configs["FACING"]["precision"].lower() == "coarse":
         increment = 22.5
         directions = [
@@ -99,6 +99,13 @@ def _facing(azimuth) -> str:
     except:
         bearing = ""
     return bearing
+
+
+def _replace_invalid_filename_characters(thestring: str) -> str:
+    invalid_chars = ["<", ">", ":", '"', "/", "\\", "|", "?", "*"]
+    for each_char in invalid_chars:
+        thestring = thestring.replace(each_char, " ")
+    return thestring
 
 
 def annotate_photos() -> None:
@@ -232,7 +239,9 @@ def create_csv() -> None:
             image_data["Description"] = all_images_exif_data[each_image][
                 "usercomment"
             ].strip()
-        image_data["Subject"] = image_data["Description"].split(".")[0]
+        image_data["Subject"] = _replace_invalid_filename_characters(
+            image_data["Description"].split(".")[0]
+        )
         data_for_csv.append(image_data)
     with open(csv_file, "w", newline="") as f:
         csv_out = csv.DictWriter(f, fieldnames=headers)
@@ -383,6 +392,8 @@ def rename_photos() -> None:
             new_photo_name = each_photo["Photo"]
             if each_photo["Subject"]:
                 new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photo']}"
+            print(Path(images_directory) / each_photo["Photo"])
+            print(output_dir / new_photo_name)
             shutil.copy2(
                 Path(images_directory) / each_photo["Photo"],
                 output_dir / new_photo_name,
