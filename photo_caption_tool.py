@@ -101,6 +101,35 @@ def _facing(azimuth: str) -> str:
     return bearing
 
 
+def _make_label(thephoto: dict) -> list:
+    label = []
+    line = []
+    if thephoto["Subject"]:
+        line.append(thephoto["Subject"])
+    if thephoto["Description"]:
+        line.append(thephoto["Description"])
+    if line:
+        label.append(": ".join(line))
+    label.append(f"Original Photo: {thephoto['Photo']}")
+    line = []
+    if thephoto["Project"]:
+        line.append(f"Project: {thephoto['Project']}")
+    if thephoto["Site"]:
+        line.append(f"Site: {thephoto['Site']}")
+    if line:
+        label.append("   ".join(line))
+    line = []
+    if thephoto["Facing"]:
+        line.append(f"Facing {thephoto['Facing']}")
+    if thephoto["GPS Coordinates"]:
+        line.append(thephoto["GPS Coordinates"])
+    if line:
+        label.append(".  ".join(line))
+    if thephoto["Timestamp"]:
+        label.append(thephoto["Timestamp"])
+    return label
+
+
 def _replace_invalid_filename_characters(thestring: str) -> str:
     invalid_chars = ["<", ">", ":", '"', "/", "\\", "|", "?", "*"]
     for each_char in invalid_chars:
@@ -129,42 +158,20 @@ def annotate_photos() -> None:
         i = 1
         for each_photo in reader:
             print(f"{i}: Annotating photo {each_photo['Photo']}.")
-            label = []
-            line = [f"Original Photo: {each_photo['Photo']}"]
-            if each_photo["Timestamp"]:
-                line.append(each_photo["Timestamp"])
-            label.append("   ".join(line))
-            line = []
-            if each_photo["Project"]:
-                line.append(f"Project: {each_photo['Project']}")
-            if each_photo["Site"]:
-                line.append(f"Site: {each_photo['Site']}")
-            if each_photo["Description"]:
-                line.append(each_photo["Description"])
-            if line:
-                label.append(".  ".join(line))
-            line = []
-            if each_photo["Facing"]:
-                line.append(f"Facing {each_photo['Facing']}")
-            if each_photo["GPS Coordinates"]:
-                line.append(each_photo["GPS Coordinates"])
-            if line:
-                label.append(".  ".join(line))
-            if not label:
-                label = ["(unlabeled)"]
+            label = _make_label(each_photo)
             orientation = all_images_exif_data[each_photo["Photo"]]["orientation"]
             if not orientation:
                 orientation = "1"
             img = Image.open(Path(images_directory) / each_photo["Photo"])
             img = img.rotate(rotation.index(orientation) * 90, expand=True)
-            img = ImageOps.pad(img, (img.width, img.height + 200), centering=(0, 0))
+            img = ImageOps.pad(img, (img.width, img.height + 320), centering=(0, 0))
             img_annotation = ImageDraw.Draw(img, mode="RGB")
             try:
                 thefont = ImageFont.truetype("Helvetica.ttc", 46)
             except:
                 thefont = ImageFont.truetype("arial.ttf", 46)
             img_annotation.text(
-                (20, img.height - 180),
+                (20, img.height - 290),
                 "\n".join(label),
                 font=thefont,
                 fill=(255, 255, 255),
@@ -223,7 +230,13 @@ def create_csv() -> None:
             ):
                 photographer.append(all_images_exif_data[each_image]["creator"])
             image_data["Photographer"] = ", ".join(photographer)
-        image_data["Timestamp"] = all_images_exif_data[each_image]["datetimeoriginal"]
+        thedate = (
+            all_images_exif_data[each_image]["datetimeoriginal"]
+            .split(" ")[0]
+            .replace(":", "-")
+        )
+        thetime = all_images_exif_data[each_image]["datetimeoriginal"].split(" ")[1]
+        image_data["Timestamp"] = f"{thedate} {thetime}"
         image_data["GPS Coordinates"] = all_images_exif_data[each_image]["gpsposition"]
         image_data["Facing"] = _facing(
             all_images_exif_data[each_image]["gpsimgdirection"]
@@ -231,17 +244,19 @@ def create_csv() -> None:
         image_data["Description"] = ""
         # Photo taken with iOS Camera.app:
         if all_images_exif_data[each_image]["imagedescription"]:
-            image_data["Description"] = all_images_exif_data[each_image][
-                "imagedescription"
-            ].strip()
+            caption = all_images_exif_data[each_image]["imagedescription"]
         # Photo taken with Theodolite.app:
         if all_images_exif_data[each_image]["usercomment"]:
-            image_data["Description"] = all_images_exif_data[each_image][
-                "usercomment"
-            ].strip()
-        image_data["Subject"] = _replace_invalid_filename_characters(
-            image_data["Description"].split(".")[0]
-        )
+            caption = all_images_exif_data[each_image]["usercomment"]
+        image_data["Subject"] = ""
+        image_data["Description"] = ""
+        if caption.find(".") > 1:
+            image_data["Subject"] = _replace_invalid_filename_characters(
+                caption.split(".")[0].strip()
+            )
+            image_data["Description"] = ".".join(caption.split(".")[1:]).strip()
+        else:
+            image_data["Description"] = caption
         data_for_csv.append(image_data)
     with open(csv_file, "w", newline="") as f:
         csv_out = csv.DictWriter(f, fieldnames=headers)
@@ -265,15 +280,15 @@ def create_word_doc() -> None:
     # Create a new Word document on A4 paper
     document = Document()
     section = document.sections[0]
-    if configs["DEFAULTS"]["papersize"].lower() == "a4":
-        section.page_height = Mm(297)
-        section.page_width = Mm(210)
-        section.left_margin = Mm(12)
-        section.right_margin = Mm(12)
-        section.top_margin = Mm(12)
-        section.bottom_margin = Mm(12)
-        photowidth = Mm(90)
-    elif configs["DEFAULTS"]["papersize"].lower() == "letter":
+    # Default papersize is a4
+    section.page_height = Mm(297)
+    section.page_width = Mm(210)
+    section.left_margin = Mm(12)
+    section.right_margin = Mm(12)
+    section.top_margin = Mm(12)
+    section.bottom_margin = Mm(12)
+    photowidth = Mm(90)
+    if configs["DEFAULTS"]["papersize"].lower() == "letter":
         section.page_height = Inches(11)
         section.page_width = Inches(8.5)
         section.left_margin = Inches(0.5)
@@ -290,12 +305,11 @@ def create_word_doc() -> None:
                 str(Path(images_directory) / each_photo["Photo"]),
                 width=photowidth,
             )
-            label = [each_photo["Photo"]]
-            if each_photo["Description"]:
-                label.append(each_photo["Description"])
-            if each_photo["Facing"]:
-                label.append(f"Facing {each_photo['Facing']}")
+            label = _make_label(each_photo)
             document.add_paragraph("\n".join(label))
+            document.add_paragraph()
+            if not i % 2:
+                document.add_page_break()
             i += 1
     document.save(word_doc)
     print("“Contact Sheet.docx” created.")
