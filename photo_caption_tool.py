@@ -250,11 +250,15 @@ def create_csv() -> None:
             caption = all_images_exif_data[each_image]["usercomment"]
         image_data["Subject"] = ""
         image_data["Description"] = ""
-        if caption.find(".") > 1:
+        if caption.find(configs["DEFAULTS"]["subjectdelimiter"]) > 1:
             image_data["Subject"] = _replace_invalid_filename_characters(
-                caption.split(".")[0].strip()
+                caption.split(configs["DEFAULTS"]["subjectdelimiter"])[0].strip()
             )
-            image_data["Description"] = ".".join(caption.split(".")[1:]).strip()
+            image_data["Description"] = (
+                configs["DEFAULTS"]["subjectdelimiter"]
+                .join(caption.split(configs["DEFAULTS"]["subjectdelimiter"])[1:])
+                .strip()
+            )
         else:
             image_data["Description"] = caption
         data_for_csv.append(image_data)
@@ -483,6 +487,7 @@ def main() -> None:
             f.write("[DEFAULTS]\n")
             f.write("# papersize options are 'a4' and 'letter'\n")
             f.write("papersize = a4\n")
+            f.write("subjectdelimiter = :\n")
             f.write("photographer = \n")
             f.write("project = \n")
             f.write("site = \n\n")
