@@ -215,58 +215,70 @@ def create_csv() -> None:
     ):
         main()
     data_for_csv = []
+    errors = []
     for each_image in all_images_exif_data:
         image_data = {"Photo": each_image}
-        image_data["Photographer"] = configs["DEFAULTS"]["photographer"]
-        image_data["Project"] = configs["DEFAULTS"]["project"]
-        image_data["Site"] = configs["DEFAULTS"]["site"]
-        if not configs["DEFAULTS"]["photographer"]:
-            photographer = []
-            if all_images_exif_data[each_image]["artist"]:
-                photographer.append(all_images_exif_data[each_image]["artist"])
-            if (
-                all_images_exif_data[each_image]["creator"]
-                and all_images_exif_data[each_image]["creator"] != photographer[0]
-            ):
-                photographer.append(all_images_exif_data[each_image]["creator"])
-            image_data["Photographer"] = ", ".join(photographer)
-        thedate = (
-            all_images_exif_data[each_image]["datetimeoriginal"]
-            .split(" ")[0]
-            .replace(":", "-")
-        )
-        thetime = all_images_exif_data[each_image]["datetimeoriginal"].split(" ")[1]
-        image_data["Timestamp"] = f"{thedate} {thetime}"
-        image_data["GPS Coordinates"] = all_images_exif_data[each_image]["gpsposition"]
-        image_data["Facing"] = _facing(
-            all_images_exif_data[each_image]["gpsimgdirection"]
-        )
-        image_data["Description"] = ""
-        # Photo taken with iOS Camera.app:
-        if all_images_exif_data[each_image]["imagedescription"]:
-            caption = all_images_exif_data[each_image]["imagedescription"]
-        # Photo taken with Theodolite.app:
-        if all_images_exif_data[each_image]["usercomment"]:
-            caption = all_images_exif_data[each_image]["usercomment"]
-        image_data["Subject"] = ""
-        image_data["Description"] = ""
-        if caption.find(configs["DEFAULTS"]["subjectdelimiter"]) > 1:
-            image_data["Subject"] = _replace_invalid_filename_characters(
-                caption.split(configs["DEFAULTS"]["subjectdelimiter"])[0].strip()
+        try:
+            image_data["Photographer"] = configs["DEFAULTS"]["photographer"]
+            image_data["Project"] = configs["DEFAULTS"]["project"]
+            image_data["Site"] = configs["DEFAULTS"]["site"]
+            if not configs["DEFAULTS"]["photographer"]:
+                photographer = []
+                if all_images_exif_data[each_image]["artist"]:
+                    photographer.append(all_images_exif_data[each_image]["artist"])
+                if (
+                    all_images_exif_data[each_image]["creator"]
+                    and all_images_exif_data[each_image]["creator"] != photographer[0]
+                ):
+                    photographer.append(all_images_exif_data[each_image]["creator"])
+                image_data["Photographer"] = ", ".join(photographer)
+            thedate = (
+                all_images_exif_data[each_image]["datetimeoriginal"]
+                .split(" ")[0]
+                .replace(":", "-")
             )
-            image_data["Description"] = (
-                configs["DEFAULTS"]["subjectdelimiter"]
-                .join(caption.split(configs["DEFAULTS"]["subjectdelimiter"])[1:])
-                .strip()
+            thetime = all_images_exif_data[each_image]["datetimeoriginal"].split(" ")[1]
+            image_data["Timestamp"] = f"{thedate} {thetime}"
+            image_data["GPS Coordinates"] = all_images_exif_data[each_image][
+                "gpsposition"
+            ]
+            image_data["Facing"] = _facing(
+                all_images_exif_data[each_image]["gpsimgdirection"]
             )
-        else:
-            image_data["Description"] = caption
+            image_data["Description"] = ""
+            # Photo taken with iOS Camera.app:
+            if all_images_exif_data[each_image]["imagedescription"]:
+                caption = all_images_exif_data[each_image]["imagedescription"]
+            # Photo taken with Theodolite.app:
+            if all_images_exif_data[each_image]["usercomment"]:
+                caption = all_images_exif_data[each_image]["usercomment"]
+            image_data["Subject"] = ""
+            image_data["Description"] = ""
+            if caption.find(configs["DEFAULTS"]["subjectdelimiter"]) > 1:
+                image_data["Subject"] = _replace_invalid_filename_characters(
+                    caption.split(configs["DEFAULTS"]["subjectdelimiter"])[0].strip()
+                )
+                image_data["Description"] = (
+                    configs["DEFAULTS"]["subjectdelimiter"]
+                    .join(caption.split(configs["DEFAULTS"]["subjectdelimiter"])[1:])
+                    .strip()
+                )
+            else:
+                image_data["Description"] = caption
+        except:
+            errors.append(each_image)
         data_for_csv.append(image_data)
     with open(csv_file, "w", newline="") as f:
         csv_out = csv.DictWriter(f, fieldnames=headers)
         csv_out.writeheader()
         csv_out.writerows(data_for_csv)
     print("“Photo Log.csv” created.")
+    if errors:
+        print("\n")
+        print("NOTICE: The following photos had corrupted or incomplete EXIF data.")
+        for each_error in errors:
+            print(f"- {each_error}")
+        print("\n")
     main()
 
 
