@@ -232,11 +232,13 @@ def create_csv() -> None:
                 ):
                     photographer.append(all_images_exif_data[each_image]["creator"])
                 image_data["Photographer"] = ", ".join(photographer)
+            thedate = ""
             thedate = (
                 all_images_exif_data[each_image]["datetimeoriginal"]
                 .split(" ")[0]
                 .replace(":", "-")
             )
+            thetime = ""
             thetime = all_images_exif_data[each_image]["datetimeoriginal"].split(" ")[1]
             image_data["Timestamp"] = f"{thedate} {thetime}"
             image_data["GPS Coordinates"] = all_images_exif_data[each_image][
@@ -245,7 +247,7 @@ def create_csv() -> None:
             image_data["Facing"] = _facing(
                 all_images_exif_data[each_image]["gpsimgdirection"]
             )
-            image_data["Description"] = ""
+            caption = ""
             # Photo taken with iOS Camera.app:
             if all_images_exif_data[each_image]["imagedescription"]:
                 caption = all_images_exif_data[each_image]["imagedescription"]
