@@ -34,7 +34,7 @@ PhotoCaptionTool hasn’t yet been tested on Linux, but you should be able to in
 1. Open a command prompt and cd into the PhotoCaptionTool folder.
 2. Run PhotoCaptionTool with the following command:  
    (_Windows_) ```python photo_caption_tool.py```  
-   (_MacOS_) ```python3 photo_caption_tool.py```
+   (_MacOS / Linux_) ```python3 photo_caption_tool.py```
 3. Enter 1 to load a folder full of JPEGs.
 4. Type the path to the folder of JPEGs or drag that folder onto the command window, then press enter.
 5. Enter 2 to create a photo log.
