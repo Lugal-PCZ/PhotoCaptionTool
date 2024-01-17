@@ -149,6 +149,8 @@ def annotate_photos() -> None:
             != "Y"
         ):
             main()
+        else:
+            shutil.rmtree(output_dir)
     output_dir.mkdir(exist_ok=True)
     rename_the_annotated_photos = False
     if (input(f"Type “Y” to also rename the annotated photos. ")).upper() == "Y":
@@ -420,6 +422,8 @@ def rename_photos() -> None:
             != "Y"
         ):
             main()
+        else:
+            shutil.rmtree(output_dir)
     output_dir.mkdir(exist_ok=True)
     with open(csv_file, "r") as f:
         reader = csv.DictReader(f)
