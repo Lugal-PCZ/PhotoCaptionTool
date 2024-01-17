@@ -180,7 +180,12 @@ def annotate_photos() -> None:
             filename = each_photo["Photo"].split(".")
             filename[-2] = f"{filename[-2]}_Annotated"
             if rename_the_annotated_photos and each_photo["Subject"]:
-                filename[-2] = f"{each_photo['Subject']} -- {filename[-2]}"
+                if each_photo["Photographer"]:
+                    filename[
+                        -2
+                    ] = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{filename[-2]}"
+                else:
+                    filename[-2] = f"{each_photo['Subject']} -- {filename[-2]}"
             filename = ".".join(filename)
             img.save(
                 Path(output_dir) / filename,
@@ -423,7 +428,10 @@ def rename_photos() -> None:
             print(f"{i}: Renaming photo {each_photo['Photo']}.")
             new_photo_name = each_photo["Photo"]
             if each_photo["Subject"]:
-                new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photo']}"
+                if each_photo["Photographer"]:
+                    new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{each_photo['Photo']}"
+                else:
+                    new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photo']}"
             print(Path(images_directory) / each_photo["Photo"])
             print(output_dir / new_photo_name)
             shutil.copy2(
