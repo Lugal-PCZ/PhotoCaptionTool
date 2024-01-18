@@ -10,7 +10,7 @@ This script takes a folder full of JPEGs and creates a photo log from which you 
 4. cd into the PhotoCaptionTool folder:  
    ```cd PhotoCaptionTool```
 5. Install the python dependencies:  
-   ```python -m pip -r requirements.txt```
+   ```python -m pip install -r requirements.txt```
 6. Download and un-zip the [exiftool Windows Executable](https://exiftool.org).
 7. Rename the executable from “exiftool -k.exe” to “exiftool.exe”
 8. Move exiftool.exe into the PhotoCaptionTool folder.
