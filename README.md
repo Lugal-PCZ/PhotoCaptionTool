@@ -23,7 +23,7 @@ This script takes a folder full of JPEGs and creates a photo log from which you 
 4. cd into the PhotoCaptionTool folder:  
    ```cd PhotoCaptionTool```
 5. Install the python dependencies:  
-   ```pip3 -r requirements.txt```
+   ```pip3 install -r requirements.txt```
 6. Download the [exiftool MacOS Package](https://exiftool.org) and run the installer.
 
 ## Linux
