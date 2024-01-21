@@ -29,6 +29,10 @@ This script takes a folder full of JPEGs and creates a photo log from which you 
 ## Linux
 PhotoCaptionTool hasn’t yet been tested on Linux, but you should be able to install python, git, and exiftool with your distribution’s package manager. Then follow steps 3–5 of the MacOS instructions, above.
 
+# Updating PhotoCaptionTool
+1. Open a command prompt and cd into the PhotoCaptionTool folder.
+2. Run ```git pull```.
+
 # Usage
 ## Basic Instructions
 1. Open a command prompt and cd into the PhotoCaptionTool folder.
