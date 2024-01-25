@@ -54,7 +54,7 @@ def _display_menu() -> str:
     print(" Q - Quit")
     valid_actions.append("Q")
     print("----------------------------")
-    return input().upper()
+    return input("> ").upper()
 
 
 def _facing(azimuth: str) -> str:
@@ -193,7 +193,7 @@ def annotate_photos() -> None:
     output_dir = Path(images_directory) / "Annotated Photos"
     if output_dir.is_dir():
         if (
-            input(f"“{output_dir}” already exists. Type “Y” to overwrite it.\n").upper()
+            input(f"“{output_dir}” already exists. Type “Y” to overwrite it.\n> ").upper()
             != "Y"
         ):
             main()
@@ -262,7 +262,7 @@ def create_csv() -> None:
     csv_file = Path(images_directory) / "Photo Log.csv"
     if (
         csv_file.is_file()
-        and input(f"“{csv_file}” already exists. Type “Y” to overwrite it.\n").upper()
+        and input(f"“{csv_file}” already exists. Type “Y” to overwrite it.\n> ").upper()
         != "Y"
     ):
         main()
@@ -343,7 +343,7 @@ def create_word_doc() -> None:
     word_doc = Path(images_directory) / "Contact Sheet.docx"
     if (
         word_doc.is_file()
-        and input(f"“{word_doc}” already exists. Type “Y” to overwrite it.\n").upper()
+        and input(f"“{word_doc}” already exists. Type “Y” to overwrite it.\n> ").upper()
         != "Y"
     ):
         main()
@@ -387,25 +387,25 @@ def create_word_doc() -> None:
 
 
 def edit_configs() -> None:
-    newvalue = input(f"Enter the path to your exiftool installation [{configs.get("EXIFTOOL", "exiftool")}]\n")
+    newvalue = input(f"Enter the path to your exiftool installation\n> {configs.get("EXIFTOOL", "exiftool")}")
     if newvalue:
         configs.set("EXIFTOOL", "exiftool", newvalue)
-    newvalue = input(f"Enter the paper size for Word docs (a4 or letter) [{configs.get("DEFAULTS", "papersize")}]\n").lower()
+    newvalue = input(f"Enter the paper size for Word docs\n(a4 or letter)\n> {configs.get("DEFAULTS", "papersize")}").lower()
     if newvalue:
         configs.set("DEFAULTS", "papersize", newvalue)
-    newvalue = input(f"Enter the delimiter between subject and description in your photo captions [{configs.get("DEFAULTS", "subjectdelimiter")}]\n")
+    newvalue = input(f"Enter the delimiter between subject and description in your photo captions\n> {configs.get("DEFAULTS", "subjectdelimiter")}")
     if newvalue:
         configs.set("DEFAULTS", "subjectdelimiter", newvalue)
-    newvalue = input(f"Enter the name or initials of the photographer [{configs.get("DEFAULTS", "photographer")}]\n")
+    newvalue = input(f"Enter the name or initials of the photographer\n> {configs.get("DEFAULTS", "photographer")}")
     if newvalue:
         configs.set("DEFAULTS", "photographer", newvalue)
-    newvalue = input(f"Enter the name of of the project [{configs.get("DEFAULTS", "project")}]\n")
+    newvalue = input(f"Enter the name of of the project\n> {configs.get("DEFAULTS", "project")}")
     if newvalue:
         configs.set("DEFAULTS", "project", newvalue)
-    newvalue = input(f"Enter the name of of the site [{configs.get("DEFAULTS", "site")}]\n")
+    newvalue = input(f"Enter the name of of the site\n> {configs.get("DEFAULTS", "site")}")
     if newvalue:
         configs.set("DEFAULTS", "site", newvalue)
-    newvalue = input(f"Enter the level of precision for the direction the photographs are facing (coarse, fine, or precise) [{configs.get("FACING", "precision")}]\n").lower()
+    newvalue = input(f"Enter the level of precision for the direction the photographs are facing\n(coarse, fine, or precise)\n> {configs.get("FACING", "precision")}").lower()
     if newvalue:
         configs.set("FACING", "precision", newvalue)
     with open("configs.ini", "w") as f:
@@ -418,7 +418,7 @@ def load_photos() -> None:
     global all_images_exif_data
     all_images_exif_data = {}
     images_directory = (
-        input("Enter the Images Folder (type the path or drag the folder onto here)\n")
+        input("Enter the Images Folder (type the path or drag the folder onto here)\n> ")
         .strip("'")
         .strip('"')
         .strip()
@@ -490,7 +490,7 @@ def rename_photos() -> None:
     output_dir = Path(images_directory) / "Renamed Photos"
     if output_dir.is_dir():
         if (
-            input(f"“{output_dir}” already exists. Type “Y” to overwrite it.\n").upper()
+            input(f"“{output_dir}” already exists. Type “Y” to overwrite it.\n> ").upper()
             != "Y"
         ):
             main()
