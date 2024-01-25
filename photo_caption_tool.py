@@ -417,12 +417,13 @@ def load_photos() -> None:
     global images_directory
     global all_images_exif_data
     all_images_exif_data = {}
-    images_directory = (
-        input("Enter the Images Folder (type the path or drag the folder onto here)\n> ")
-        .strip("'")
-        .strip('"')
-        .strip()
-    )
+    images_directory = input("Enter the Images Folder (type the path or drag the folder onto here)\n> ")
+    if images_directory[0] == "'" and images_directory[-1] == "'":
+        images_directory = images_directory.strip("'")
+    elif images_directory[0] == '"' and images_directory[-1] == '"':
+        images_directory = images_directory.strip('"')
+    else:
+        images_directory = images_directory.strip()
     if "PosixPath" in str(type(Path())):
         images_directory = images_directory.replace("\\", "")
     if images_directory.startswith("~"):
