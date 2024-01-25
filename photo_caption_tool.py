@@ -13,7 +13,7 @@ from docx import Document
 from docx.shared import Inches, Mm
 
 
-configs = configparser.ConfigParser()
+configs = configparser.ConfigParser(comment_prefixes="|", allow_no_value=True)
 images_directory = ""
 all_images_exif_data = {}
 rotation = ["1", "8", "3", "6"]  # Rotation of images, as represented in EXIF
@@ -49,6 +49,8 @@ def _display_menu() -> str:
                 valid_actions.append("7")
             print(" 8 - Update Original Photos")
             valid_actions.append("8")
+    print(" E - Edit Configs")
+    valid_actions.append("E")
     print(" Q - Quit")
     valid_actions.append("Q")
     print("----------------------------")
@@ -56,7 +58,7 @@ def _display_menu() -> str:
 
 
 def _facing(azimuth: str) -> str:
-    if configs["FACING"]["precision"].lower() == "coarse":
+    if configs.get("FACING", "precision").lower() == "coarse":
         increment = 22.5
         directions = [
             "N",
@@ -69,7 +71,7 @@ def _facing(azimuth: str) -> str:
             "NW",
             "N",
         ]
-    elif configs["FACING"]["precision"].lower() == "fine":
+    elif configs.get("FACING", "precision").lower() == "fine":
         increment = 11.25
         directions = [
             "N",
@@ -92,7 +94,7 @@ def _facing(azimuth: str) -> str:
         ]
     try:
         azimuth = float(azimuth)
-        if configs["FACING"]["precision"].lower() == "precise":
+        if configs.get("FACING", "precision").lower() == "precise":
             bearing = f"{round(azimuth)}°"
         else:
             bearing = directions[math.ceil(math.floor((azimuth % 360) / increment) / 2)]
@@ -130,6 +132,52 @@ def _make_label(thephoto: dict) -> list:
     return label
 
 
+def _read_configs() -> None:
+    global configs
+    if not Path("configs.ini").is_file():
+        with open("configs.ini", "w") as f:
+            pass
+    configs.read("configs.ini")
+    if not configs.has_section("EXIFTOOL"):
+        configs.add_section("EXIFTOOL")
+    if not configs.has_section("DEFAULTS"):
+        configs.add_section("DEFAULTS")
+    if not configs.has_section("FACING"):
+        configs.add_section("FACING")
+    if not configs.has_option("EXIFTOOL", "exiftool"):
+        if platform.system() == "Linux":
+            configs.set("EXIFTOOL", "# Linux standard location of exiftool in $PATH")
+            configs.set("EXIFTOOL", "exiftool", "exiftool")
+        elif platform.system() == "Darwin":
+            configs.set("EXIFTOOL", "# MacOS standard location of exiftool")
+            configs.set("EXIFTOOL", "exiftool", "/usr/local/bin/exiftool")
+        elif platform.system() == "Windows":
+            configs.set(
+                "EXIFTOOL",
+                "# Windows recommended location of exiftool in PhotoCaptionTool folder",
+            )
+            configs.set("EXIFTOOL", "exiftool", "exiftool.exe")
+    if not configs.has_option("DEFAULTS", "papersize"):
+        configs.set("DEFAULTS", "# papersize options are 'a4' and 'letter'")
+        configs.set("DEFAULTS", "papersize", "a4")
+    if not configs.has_option("DEFAULTS", "subjectdelimiter"):
+        configs.set("DEFAULTS", "subjectdelimiter", ":")
+    if not configs.has_option("DEFAULTS", "photographer"):
+        configs.set("DEFAULTS", "photographer", "")
+    if not configs.has_option("DEFAULTS", "project"):
+        configs.set("DEFAULTS", "project", "")
+    if not configs.has_option("DEFAULTS", "site"):
+        configs.set("DEFAULTS", "site", "")
+    if not configs.has_option("FACING", "precision"):
+        configs.set("FACING", "# precision options are")
+        configs.set("FACING", "#   'coarse' (N, NE, E, SE, S, SW, W, NW)")
+        configs.set("FACING", "#   'fine' (N, NNE, NE, ENE, E, and so-on)")
+        configs.set("FACING", "#   'precise' (the actual bearing, in degrees)")
+        configs.set("FACING", "precision", "coarse")
+    with open("configs.ini", "w") as f:
+        configs.write(f)
+
+
 def _replace_invalid_filename_characters(thestring: str) -> str:
     invalid_chars = ["<", ">", ":", '"', "/", "\\", "|", "?", "*"]
     for each_char in invalid_chars:
@@ -145,7 +193,7 @@ def annotate_photos() -> None:
     output_dir = Path(images_directory) / "Annotated Photos"
     if output_dir.is_dir():
         if (
-            input(f"“{output_dir}” already exists. Type “Y” to overwrite it. ").upper()
+            input(f"“{output_dir}” already exists. Type “Y” to overwrite it.\n").upper()
             != "Y"
         ):
             main()
@@ -214,7 +262,7 @@ def create_csv() -> None:
     csv_file = Path(images_directory) / "Photo Log.csv"
     if (
         csv_file.is_file()
-        and input(f"“{csv_file}” already exists. Type “Y” to overwrite it. ").upper()
+        and input(f"“{csv_file}” already exists. Type “Y” to overwrite it.\n").upper()
         != "Y"
     ):
         main()
@@ -223,10 +271,10 @@ def create_csv() -> None:
     for each_image in all_images_exif_data:
         image_data = {"Photo": each_image}
         try:
-            image_data["Photographer"] = configs["DEFAULTS"]["photographer"]
-            image_data["Project"] = configs["DEFAULTS"]["project"]
-            image_data["Site"] = configs["DEFAULTS"]["site"]
-            if not configs["DEFAULTS"]["photographer"]:
+            image_data["Photographer"] = configs.get("DEFAULTS", "photographer")
+            image_data["Project"] = configs.get("DEFAULTS", "project")
+            image_data["Site"] = configs.get("DEFAULTS", "site")
+            if not configs.get("DEFAULTS", "photographer"):
                 photographer = []
                 if all_images_exif_data[each_image]["artist"]:
                     photographer.append(all_images_exif_data[each_image]["artist"])
@@ -260,13 +308,13 @@ def create_csv() -> None:
                 caption = all_images_exif_data[each_image]["usercomment"]
             image_data["Subject"] = ""
             image_data["Description"] = ""
-            if caption.find(configs["DEFAULTS"]["subjectdelimiter"]) > 1:
+            if caption.find(configs.get("DEFAULTS", "subjectdelimiter")) > 1:
                 image_data["Subject"] = _replace_invalid_filename_characters(
-                    caption.split(configs["DEFAULTS"]["subjectdelimiter"])[0].strip()
+                    caption.split(configs.get("DEFAULTS", "subjectdelimiter"))[0].strip()
                 )
                 image_data["Description"] = (
-                    configs["DEFAULTS"]["subjectdelimiter"]
-                    .join(caption.split(configs["DEFAULTS"]["subjectdelimiter"])[1:])
+                    configs.get("DEFAULTS", "subjectdelimiter")
+                    .join(caption.split(configs.get("DEFAULTS", "subjectdelimiter"))[1:])
                     .strip()
                 )
             else:
@@ -295,7 +343,7 @@ def create_word_doc() -> None:
     word_doc = Path(images_directory) / "Contact Sheet.docx"
     if (
         word_doc.is_file()
-        and input(f"“{word_doc}” already exists. Type “Y” to overwrite it. ").upper()
+        and input(f"“{word_doc}” already exists. Type “Y” to overwrite it.\n").upper()
         != "Y"
     ):
         main()
@@ -310,7 +358,7 @@ def create_word_doc() -> None:
     section.top_margin = Mm(12)
     section.bottom_margin = Mm(12)
     photowidth = Mm(90)
-    if configs["DEFAULTS"]["papersize"].lower() == "letter":
+    if configs.get("DEFAULTS", "papersize").lower() == "letter":
         section.page_height = Inches(11)
         section.page_width = Inches(8.5)
         section.left_margin = Inches(0.5)
@@ -338,12 +386,39 @@ def create_word_doc() -> None:
     main()
 
 
+def edit_configs() -> None:
+    newvalue = input(f"Enter the path to your exiftool installation [{configs.get("EXIFTOOL", "exiftool")}]\n")
+    if newvalue:
+        configs.set("EXIFTOOL", "exiftool", newvalue)
+    newvalue = input(f"Enter the paper size for Word docs (a4 or letter) [{configs.get("DEFAULTS", "papersize")}]\n").lower()
+    if newvalue:
+        configs.set("DEFAULTS", "papersize", newvalue)
+    newvalue = input(f"Enter the delimiter between subject and description in your photo captions [{configs.get("DEFAULTS", "subjectdelimiter")}]\n")
+    if newvalue:
+        configs.set("DEFAULTS", "subjectdelimiter", newvalue)
+    newvalue = input(f"Enter the name or initials of the photographer [{configs.get("DEFAULTS", "photographer")}]\n")
+    if newvalue:
+        configs.set("DEFAULTS", "photographer", newvalue)
+    newvalue = input(f"Enter the name of of the project [{configs.get("DEFAULTS", "project")}]\n")
+    if newvalue:
+        configs.set("DEFAULTS", "project", newvalue)
+    newvalue = input(f"Enter the name of of the site [{configs.get("DEFAULTS", "site")}]\n")
+    if newvalue:
+        configs.set("DEFAULTS", "site", newvalue)
+    newvalue = input(f"Enter the level of precision for the direction the photographs are facing (coarse, fine, or precise) [{configs.get("FACING", "precision")}]\n").lower()
+    if newvalue:
+        configs.set("FACING", "precision", newvalue)
+    with open("configs.ini", "w") as f:
+        configs.write(f)
+    main()
+
+
 def load_photos() -> None:
     global images_directory
     global all_images_exif_data
     all_images_exif_data = {}
     images_directory = (
-        input("Enter the Images Folder\n(type the path or drag the folder onto here): ")
+        input("Enter the Images Folder (type the path or drag the folder onto here)\n")
         .strip("'")
         .strip('"')
         .strip()
@@ -378,7 +453,7 @@ def load_photos() -> None:
         for each_image in images:
             exif_data = subprocess.run(
                 [
-                    Path(configs["EXIFTOOL"]["exiftool"]),
+                    Path(configs.get("EXIFTOOL", "exiftool")),
                     "-T",
                     "-c",
                     "%d°%d'%.2f\"",
@@ -415,7 +490,7 @@ def rename_photos() -> None:
     output_dir = Path(images_directory) / "Renamed Photos"
     if output_dir.is_dir():
         if (
-            input(f"“{output_dir}” already exists. Type “Y” to overwrite it. ").upper()
+            input(f"“{output_dir}” already exists. Type “Y” to overwrite it.\n").upper()
             != "Y"
         ):
             main()
@@ -426,19 +501,18 @@ def rename_photos() -> None:
         reader = csv.DictReader(f)
         i = 1
         for each_photo in reader:
-            print(f"{i}: Renaming photo {each_photo['Photo']}.")
             new_photo_name = each_photo["Photo"]
             if each_photo["Subject"]:
                 if each_photo["Photographer"]:
                     new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{each_photo['Photo']}"
                 else:
                     new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photo']}"
-            print(Path(images_directory) / each_photo["Photo"])
-            print(output_dir / new_photo_name)
+            print(f"{i}: Renaming photo {each_photo['Photo']}.")
             shutil.copy2(
                 Path(images_directory) / each_photo["Photo"],
                 output_dir / new_photo_name,
             )
+            i += 1
     main()
 
 
@@ -488,43 +562,10 @@ def view_word_doc() -> None:
 
 
 def main() -> None:
-    global configs
-    try:
-        with open("configs.ini", "r") as f:
-            pass
-    except:
-        with open("configs.ini", "w") as f:
-            f.write("[EXIFTOOL]\n")
-            if platform.system() == "Linux":
-                f.write("# Linux standard location of exiftool in $PATH\n")
-                f.write("exiftool = exiftool\n")
-            elif platform.system() == "Darwin":
-                f.write("# MacOS standard location of exiftool\n")
-                f.write("exiftool = /usr/local/bin/exiftool\n")
-            elif platform.system() == "Windows":
-                f.write(
-                    "# Windows recommended location of exiftool in PhotoCaptionTool folder\n"
-                )
-                f.write("exiftool = exiftool.exe\n")
-            f.write("\n")
-            f.write("[DEFAULTS]\n")
-            f.write("# papersize options are 'a4' and 'letter'\n")
-            f.write("papersize = a4\n")
-            f.write("subjectdelimiter = :\n")
-            f.write("photographer = \n")
-            f.write("project = \n")
-            f.write("site = \n\n")
-            f.write("[FACING]\n")
-            f.write("# precision options are:\n")
-            f.write("#  'coarse' (N, NE, E, SE, S, SW, W, NW)\n")
-            f.write("#  'fine' (N, NNE, NE, ENE, E, and so-on)\n")
-            f.write("#  'precise' (the actual bearing, in degrees)\n")
-            f.write("precision = coarse\n")
-    configs.read("configs.ini")
-    exiftool = Path(configs["EXIFTOOL"]["exiftool"])
-    if not exiftool.is_file():
-        exit(
-            "EXITING:\nexiftool not found at the location indicated in the configs.ini file. Install it (https://exiftool.org) or update its path to use this script."
+    _read_configs()
+    if not Path(configs.get("EXIFTOOL", "exiftool")).is_file():
+        print(
+            "\nexiftool not found at the location indicated in the configs.ini file. Install it (https://exiftool.org) or enter “E” to edit the configs and update its path."
         )
     action = ""
     while action not in valid_actions:
@@ -545,6 +586,8 @@ def main() -> None:
         view_word_doc()
     elif action == "8":
         update_originals()
+    elif action == "E":
+        edit_configs()
     elif action == "Q":
         exit()
 
