@@ -14,10 +14,12 @@ from docx.shared import Inches, Mm
 
 
 configs = configparser.ConfigParser(comment_prefixes="|", allow_no_value=True)
+configs.optionxform = str
 images_directory = ""
 all_images_exif_data = {}
 rotation = ["1", "8", "3", "6"]  # Rotation of images, as represented in EXIF
 valid_actions = []
+originals_filed = False
 
 
 def _display_menu() -> str:
@@ -38,9 +40,9 @@ def _display_menu() -> str:
         if csv_file.is_file():
             print(" 3 - View CSV File")
             valid_actions.append("3")
-            print(" 4 - Rename Photos")
+            print(" 4 - Copy and Rename Photos")
             valid_actions.append("4")
-            print(" 5 - Create Annotated Photos")
+            print(" 5 - Annotate and Rename Photos")
             valid_actions.append("5")
             print(" 6 - Create Contact Sheet")
             valid_actions.append("6")
@@ -157,6 +159,8 @@ def _read_configs() -> None:
                 "# Windows recommended location of exiftool in PhotoCaptionTool folder",
             )
             configs.set("EXIFTOOL", "exiftool", "exiftool.exe")
+    if not configs.has_option("DEFAULTS", "fileoriginals"):
+        configs.set("DEFAULTS", "fileoriginals", "false")
     if not configs.has_option("DEFAULTS", "papersize"):
         configs.set("DEFAULTS", "# papersize options are 'a4' and 'letter'")
         configs.set("DEFAULTS", "papersize", "a4")
@@ -176,6 +180,11 @@ def _read_configs() -> None:
         configs.set("FACING", "precision", "coarse")
     with open("configs.ini", "w") as f:
         configs.write(f)
+    if not shutil.which(configs.get("EXIFTOOL", "exiftool")):
+        print("NOTICE:")
+        print(
+            "exiftool not found at the location indicated in the configs.ini file. Install it (https://exiftool.org) or enter “E” to edit the configs and update its path."
+        )
 
 
 def _replace_invalid_filename_characters(thestring: str) -> str:
@@ -193,7 +202,9 @@ def annotate_photos() -> None:
     output_dir = Path(images_directory) / "Annotated Photos"
     if output_dir.is_dir():
         if (
-            input(f"“{output_dir}” already exists. Type “Y” to overwrite it.\n> ").upper()
+            input(
+                f"“{output_dir}” already exists. Type “Y” to overwrite it.\n> "
+            ).upper()
             != "Y"
         ):
             main()
@@ -310,11 +321,15 @@ def create_csv() -> None:
             image_data["Description"] = ""
             if caption.find(configs.get("DEFAULTS", "subjectdelimiter")) > 1:
                 image_data["Subject"] = _replace_invalid_filename_characters(
-                    caption.split(configs.get("DEFAULTS", "subjectdelimiter"))[0].strip()
+                    caption.split(configs.get("DEFAULTS", "subjectdelimiter"))[
+                        0
+                    ].strip()
                 )
                 image_data["Description"] = (
                     configs.get("DEFAULTS", "subjectdelimiter")
-                    .join(caption.split(configs.get("DEFAULTS", "subjectdelimiter"))[1:])
+                    .join(
+                        caption.split(configs.get("DEFAULTS", "subjectdelimiter"))[1:]
+                    )
                     .strip()
                 )
             else:
@@ -387,27 +402,84 @@ def create_word_doc() -> None:
 
 
 def edit_configs() -> None:
-    newvalue = input(f"Enter the path to your exiftool installation\n> {configs.get("EXIFTOOL", "exiftool")}")
-    if newvalue:
-        configs.set("EXIFTOOL", "exiftool", newvalue)
-    newvalue = input(f"Enter the paper size for Word docs\n(a4 or letter)\n> {configs.get("DEFAULTS", "papersize")}").lower()
-    if newvalue:
-        configs.set("DEFAULTS", "papersize", newvalue)
-    newvalue = input(f"Enter the delimiter between subject and description in your photo captions\n> {configs.get("DEFAULTS", "subjectdelimiter")}")
-    if newvalue:
-        configs.set("DEFAULTS", "subjectdelimiter", newvalue)
-    newvalue = input(f"Enter the name or initials of the photographer\n> {configs.get("DEFAULTS", "photographer")}")
-    if newvalue:
-        configs.set("DEFAULTS", "photographer", newvalue)
-    newvalue = input(f"Enter the name of of the project\n> {configs.get("DEFAULTS", "project")}")
-    if newvalue:
-        configs.set("DEFAULTS", "project", newvalue)
-    newvalue = input(f"Enter the name of of the site\n> {configs.get("DEFAULTS", "site")}")
-    if newvalue:
-        configs.set("DEFAULTS", "site", newvalue)
-    newvalue = input(f"Enter the level of precision for the direction the photographs are facing\n(coarse, fine, or precise)\n> {configs.get("FACING", "precision")}").lower()
-    if newvalue:
-        configs.set("FACING", "precision", newvalue)
+    # exiftool
+    print("Enter the path to your exiftool installation.")
+    exiftool = input(f"[{configs.get('EXIFTOOL', 'exiftool')}] > ")
+    if exiftool:
+        configs.set("EXIFTOOL", "exiftool", exiftool)
+        # TODO: use shutil.which() to check the validity of the path
+
+    # fileoriginals
+    print("Automatically file the original photos in their own sub-folder?")
+    fileoriginals = input(f"[{configs.get('DEFAULTS', 'fileoriginals')}] > ")
+    if fileoriginals:
+        while fileoriginals not in ["true", "false"]:
+            print("Invalid option entered. Please enter either true or false.")
+            fileoriginals = input(
+                f"[{configs.get('DEFAULTS', 'fileoriginals')}] > "
+            ).lower()
+            if not fileoriginals:
+                fileoriginals = configs.get("DEFAULTS", "fileoriginals")
+        configs.set("DEFAULTS", "fileoriginals", fileoriginals)
+
+    # papersize
+    print("Enter the paper size for Word docs.")
+    print("(options are a4 or letter)")
+    papersize = input(f"[{configs.get('DEFAULTS', 'papersize')}] > ").lower()
+    if papersize:
+        while papersize not in ["a4", "letter"]:
+            print("Invalid option entered. Please enter either a4 or letter.")
+            papersize = input(f"[{configs.get('DEFAULTS', 'papersize')}] > ").lower()
+            if not papersize:
+                papersize = configs.get("DEFAULTS", "papersize")
+        configs.set("DEFAULTS", "papersize", papersize)
+
+    # subjectdelimiter
+    print("Enter the delimiter between subject and description in your photo captions.")
+    subjectdelimiter = input(f"[{configs.get('DEFAULTS', 'subjectdelimiter')}] > ")
+    if subjectdelimiter:
+        configs.set("DEFAULTS", "subjectdelimiter", subjectdelimiter)
+
+    # photographer
+    print(
+        "Enter the name or initials of the photographer. Dash (-) to clear this setting."
+    )
+    photographer = input(f"[{configs.get('DEFAULTS', 'photographer')}] > ")
+    if photographer:
+        if photographer == "-":
+            photographer = ""
+        configs.set("DEFAULTS", "photographer", photographer)
+
+    # project
+    print("Enter the name of of the project. Dash (-) to clear this setting.")
+    project = input(f"[{configs.get('DEFAULTS', 'project')}] > ")
+    if project:
+        if project == "-":
+            project = ""
+        configs.set("DEFAULTS", "project", project)
+
+    # site
+    print("Enter the name of of the site. Dash (-) to clear this setting")
+    site = input(f"[{configs.get('DEFAULTS', 'site')}] > ")
+    if site:
+        if site == "-":
+            site = ""
+        configs.set("DEFAULTS", "site", site)
+
+    # precision
+    print("Enter the level of precision for the direction the photographs are facing.")
+    print("(options are coarse, fine, or precise)")
+    precision = input(f"[{configs.get('FACING', 'precision')}] > ").lower()
+    if precision:
+        while precision not in ["coarse", "fine", "precise"]:
+            print(
+                "Invalid option entered. Please enter either coarse, fine, or precise."
+            )
+            precision = input(f"[{configs.get('FACING', 'precision')}] > ")
+            if not precision:
+                precision = configs.get("FACING", "precision")
+        configs.set("FACING", "precision", precision)
+
     with open("configs.ini", "w") as f:
         configs.write(f)
     main()
@@ -417,13 +489,15 @@ def load_photos() -> None:
     global images_directory
     global all_images_exif_data
     all_images_exif_data = {}
-    images_directory = input("Enter the Images Folder (type the path or drag the folder onto here)\n> ")
+    images_directory = input(
+        "Enter the Images Folder (type the path or drag the folder onto here)\n> "
+    )
+    if not images_directory:
+        main()
     if images_directory[0] == "'" and images_directory[-1] == "'":
         images_directory = images_directory.strip("'")
     elif images_directory[0] == '"' and images_directory[-1] == '"':
         images_directory = images_directory.strip('"')
-    else:
-        images_directory = images_directory.strip()
     if "PosixPath" in str(type(Path())):
         images_directory = images_directory.replace("\\", "")
     if images_directory.startswith("~"):
@@ -491,7 +565,9 @@ def rename_photos() -> None:
     output_dir = Path(images_directory) / "Renamed Photos"
     if output_dir.is_dir():
         if (
-            input(f"“{output_dir}” already exists. Type “Y” to overwrite it.\n> ").upper()
+            input(
+                f"“{output_dir}” already exists. Type “Y” to overwrite it.\n> "
+            ).upper()
             != "Y"
         ):
             main()
@@ -564,10 +640,6 @@ def view_word_doc() -> None:
 
 def main() -> None:
     _read_configs()
-    if not Path(configs.get("EXIFTOOL", "exiftool")).is_file():
-        print(
-            "\nexiftool not found at the location indicated in the configs.ini file. Install it (https://exiftool.org) or enter “E” to edit the configs and update its path."
-        )
     action = ""
     while action not in valid_actions:
         action = _display_menu()
