@@ -19,7 +19,6 @@ images_directory = ""
 all_images_exif_data = {}
 rotation = ["1", "8", "3", "6"]  # Rotation of images, as represented in EXIF
 valid_actions = []
-originals_filed = False
 
 
 def _display_menu() -> str:
@@ -159,8 +158,6 @@ def _read_configs() -> None:
                 "# Windows recommended location of exiftool in PhotoCaptionTool folder",
             )
             configs.set("EXIFTOOL", "exiftool", "exiftool.exe")
-    if not configs.has_option("DEFAULTS", "fileoriginals"):
-        configs.set("DEFAULTS", "fileoriginals", "false")
     if not configs.has_option("DEFAULTS", "papersize"):
         configs.set("DEFAULTS", "# papersize options are 'a4' and 'letter'")
         configs.set("DEFAULTS", "papersize", "a4")
@@ -408,19 +405,6 @@ def edit_configs() -> None:
     if exiftool:
         configs.set("EXIFTOOL", "exiftool", exiftool)
         # TODO: use shutil.which() to check the validity of the path
-
-    # fileoriginals
-    print("Automatically file the original photos in their own sub-folder?")
-    fileoriginals = input(f"[{configs.get('DEFAULTS', 'fileoriginals')}] > ")
-    if fileoriginals:
-        while fileoriginals not in ["true", "false"]:
-            print("Invalid option entered. Please enter either true or false.")
-            fileoriginals = input(
-                f"[{configs.get('DEFAULTS', 'fileoriginals')}] > "
-            ).lower()
-            if not fileoriginals:
-                fileoriginals = configs.get("DEFAULTS", "fileoriginals")
-        configs.set("DEFAULTS", "fileoriginals", fileoriginals)
 
     # papersize
     print("Enter the paper size for Word docs.")
