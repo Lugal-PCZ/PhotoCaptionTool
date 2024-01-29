@@ -482,6 +482,8 @@ def load_photos() -> None:
         images_directory = images_directory.strip("'")
     elif images_directory[0] == '"' and images_directory[-1] == '"':
         images_directory = images_directory.strip('"')
+    else:
+        images_directory = images_directory.strip()
     if "PosixPath" in str(type(Path())):
         images_directory = images_directory.replace("\\", "")
     if images_directory.startswith("~"):
