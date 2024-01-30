@@ -516,8 +516,6 @@ def load_photos() -> None:
                 [
                     Path(configs.get("EXIFTOOL", "exiftool")),
                     "-T",
-                    "-c",
-                    "%d°%d'%.2f\"",
                     *tags,
                     Path(images_directory) / each_image,
                 ],
