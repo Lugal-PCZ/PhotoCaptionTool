@@ -9,16 +9,30 @@ import subprocess
 from pathlib import Path
 
 from PIL import Image, ImageOps, ImageFont, ImageDraw
+from pillow_heif import register_heif_opener
 from docx import Document
 from docx.shared import Inches, Mm
 
 
+register_heif_opener()
 configs = configparser.ConfigParser(comment_prefixes="|", allow_no_value=True)
 configs.optionxform = str
 images_directory = ""
 all_images_exif_data = {}
 rotation = ["1", "8", "3", "6"]  # Rotation of images, as represented in EXIF
 valid_actions = []
+
+
+def _build_new_caption(project, site, subject, description) -> str:
+    caption = ""
+    if project:
+        caption = f"Project: {project}. "
+    if site:
+        caption += f"Site: {site}. "
+    if subject:
+        caption += f"{subject}: "
+    caption += description
+    return caption
 
 
 def _display_menu() -> str:
@@ -48,8 +62,7 @@ def _display_menu() -> str:
             if word_doc.is_file():
                 print(" 7 - View Contact Sheet")
                 valid_actions.append("7")
-            print(" 8 - Update Original Photos")
-            valid_actions.append("8")
+    print("     ------------")
     print(" E - Edit Configs")
     valid_actions.append("E")
     print(" Q - Quit")
@@ -232,16 +245,16 @@ def annotate_photos() -> None:
                 fill=(255, 255, 255),
                 spacing=20,
             )
-            filename = each_photo["Photo"].split(".")
-            filename[-2] = f"{filename[-2]}_Annotated"
+            filename = each_photo["Photo"].split(".")[:-1]
+            filename[-1] = f"{filename[-1]}_Annotated"
             if each_photo["Subject"]:
                 if each_photo["Photographer"]:
                     filename[
-                        -2
-                    ] = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{filename[-2]}"
+                        -1
+                    ] = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{filename[-1]}"
                 else:
-                    filename[-2] = f"{each_photo['Subject']} -- {filename[-2]}"
-            filename = ".".join(filename)
+                    filename[-1] = f"{each_photo['Subject']} -- {filename[-1]}"
+            filename = f"{'.'.join(filename)}.jpg"
             img.save(
                 Path(output_dir) / filename,
                 quality=80,
@@ -249,6 +262,30 @@ def annotate_photos() -> None:
                 progressive=True,
             )
             img.close()
+            caption = _build_new_caption(
+                each_photo["Project"],
+                each_photo["Site"],
+                each_photo["Subject"],
+                each_photo["Description"],
+            )
+            _ = subprocess.run(
+                [
+                    Path(configs.get("EXIFTOOL", "exiftool")),
+                    "-tagsFromFile",
+                    Path(images_directory) / each_photo["Photo"],
+                    "-all:all",
+                    Path(output_dir) / filename,
+                    f"-artist={each_photo['Photographer']}",
+                    f"-imagedescription={caption}",
+                    f"-caption-abstract={caption}",
+                    f"-description={caption}",
+                    "--usercomment",
+                    "-overwrite_original",
+                    Path(output_dir) / filename,
+                    "-overwrite_original",
+                ],
+                capture_output=True,
+            )
             i += 1
     main()
 
@@ -492,7 +529,7 @@ def load_photos() -> None:
     items = Path(images_directory).glob("*.*")
     for each_item in items:
         if each_item.name[0] != "." and re.match(
-            r".*\.jpe?g", each_item.name, flags=re.IGNORECASE
+            r"(.*\.jpe?g)|(.*\.heic)", each_item.name, flags=re.IGNORECASE
         ):
             images.append(each_item.name)
             images.sort()
@@ -562,45 +599,48 @@ def rename_photos() -> None:
         reader = csv.DictReader(f)
         i = 1
         for each_photo in reader:
-            new_photo_name = each_photo["Photo"]
+            print(f"{i}: Renaming photo {each_photo['Photo']}.")
+            filename = each_photo["Photo"].split(".")[:-1]
+            new_photo_name = f"{'.'.join(filename)}.jpg"
             if each_photo["Subject"]:
                 if each_photo["Photographer"]:
-                    new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{each_photo['Photo']}"
+                    new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{new_photo_name}"
                 else:
-                    new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photo']}"
-            print(f"{i}: Renaming photo {each_photo['Photo']}.")
-            shutil.copy2(
-                Path(images_directory) / each_photo["Photo"],
-                output_dir / new_photo_name,
+                    new_photo_name = f"{each_photo['Subject']} -- {new_photo_name}"
+            if each_photo["Photo"][-4:].upper() == "HEIC":
+                img = Image.open(Path(images_directory) / each_photo["Photo"])
+                img.save(
+                    Path(output_dir) / new_photo_name,
+                    quality=80,
+                    optimize=True,
+                    progressive=True,
+                )
+                img.close()
+            else:
+                shutil.copy2(
+                    Path(images_directory) / each_photo["Photo"],
+                    Path(output_dir) / new_photo_name,
+                )
+            caption = _build_new_caption(
+                each_photo["Project"],
+                each_photo["Site"],
+                each_photo["Subject"],
+                each_photo["Description"],
             )
-            i += 1
-    main()
-
-
-def update_originals() -> None:
-    csv_file = Path(images_directory) / "Photo Log.csv"
-    if not csv_file.is_file():
-        main()
-    with open(csv_file, "r") as f:
-        reader = csv.DictReader(f)
-        for each_photo in reader:
-            caption = ""
-            if each_photo["Project"]:
-                caption = f"Project: {each_photo['Project']}. "
-            if each_photo["Site"]:
-                caption += f"Site: {each_photo['Site']}. "
-            caption += each_photo["Description"]
-            subprocess.run(
+            _ = subprocess.run(
                 [
-                    "exiftool",
+                    Path(configs.get("EXIFTOOL", "exiftool")),
                     f"-artist={each_photo['Photographer']}",
                     f"-imagedescription={caption}",
                     f"-caption-abstract={caption}",
                     f"-description={caption}",
                     "--usercomment",
-                    Path(images_directory) / each_photo["Photo"],
-                ]
+                    "-overwrite_original",
+                    Path(output_dir) / new_photo_name,
+                ],
+                capture_output=True,
             )
+            i += 1
     main()
 
 
@@ -641,8 +681,6 @@ def main() -> None:
         create_word_doc()
     elif action == "7":
         view_word_doc()
-    elif action == "8":
-        update_originals()
     elif action == "E":
         edit_configs()
     elif action == "Q":
