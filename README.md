@@ -1,5 +1,5 @@
 # About PhotoCaptionTool
-This script takes a folder full of JPEGs and creates a photo log from which you can generate annotated photos or update the originals’ metadata, leveraging [exiftool](https://exiftool.org) to do so. It is written for archaeologist and geared to their needs, but can help with any kind of work that is grouped into projects and sites.
+This script takes a folder full of JPEGs or HEICs and creates a photo log from which you can generate annotated photos or update the originals’ metadata, leveraging [exiftool](https://exiftool.org) to do so. It is written for archaeologist and geared to their needs, but can help with any kind of work that is grouped into projects and sites.
 
 # Installation
 ## Windows
@@ -44,10 +44,9 @@ PhotoCaptionTool hasn’t yet been tested on Linux, but you should be able to in
 5. Enter 2 to create a photo log.
 6. Enter 3 or double-click on the “Photo Log.csv” file in the JPEGs folder to view and edit the photo log.
 7. Edit the photo log as necessary and save your changes.
-8. (_optional_) Enter 4 to copy the the unmodified JPEGs into a “Renamed Photos” folder, with the subject prepended to the file names.
-9. (_optional_) Enter 5 to created annotated versions of the JPEGs, saved to an “Annotated Photos” folder. You will also be given the option to rename those annotated photos with the subject prepended to the file names.
+8. (_optional_) Enter 4 to copy the the unmodified JPEGs into a “Renamed Photos” folder, with the subject and photographer prepended to the file names. HEIC files will be automatically converted to JPEGs.
+9. (_optional_) Enter 5 to created annotated versions of the JPEGs, saved to an “Annotated Photos” folder, with the subject and photographer prepended to the file names. HEIC files will be automatically converted to JPEGs.
 10. (_optional_) Enter 6 to create a Word doc with the photos with captions taken from the photo log. You can then enter 7 or double-click the Word doc to view it.
-11. (_optional_) Enter 8 to write the data back to copies of the original JPEGs.
 
 ## Editing the configs.ini File
 The first time that you run PhotoCaptionTool it will create a generic configs.ini file in the PhotoCaptionTool folder. You can then edit that configs.ini file to preset data and tailor the way that the script generates its outputs. The available options are:
