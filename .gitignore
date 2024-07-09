@@ -1,5 +1,6 @@
 __pycache__
 .DS_Store
 venv
+venv.nosync
 .vscode
 configs.ini

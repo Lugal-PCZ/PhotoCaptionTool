@@ -22,6 +22,14 @@ all_images_exif_data = {}
 rotation = ["1", "8", "3", "6"]  # Rotation of images, as represented in EXIF
 valid_actions = []
 
+class highlight:
+    def red(thetext):
+        return f"\033[31m{thetext}\033[0m"
+    def green(thetext):
+        return f"\033[32m{thetext}\033[0m"
+    def bold(thetext):
+        return f"\033[1m{thetext}\033[0m"
+
 
 def _build_new_caption(project, site, subject, description) -> str:
     caption = ""
@@ -38,34 +46,34 @@ def _build_new_caption(project, site, subject, description) -> str:
 def _display_menu() -> str:
     global valid_actions
     if images_directory:
-        print(f"\nPhotos Folder: {images_directory}")
+        print(f"\nPhotos Folder: {highlight.green(images_directory)}")
     else:
-        print(f"\nPhotos Folder: (not set)")
+        print(f"\nPhotos Folder: {highlight.red('(not set)')}")
     print("----------------------------")
     print(" Choose an action:")
-    print(" 1 - Load Photos from Folder")
+    print(f" {highlight.bold('1')} - Load Photos from Folder")
     valid_actions = ["1"]
     if images_directory:
         csv_file = Path(images_directory) / "Photo Log.csv"
         word_doc = Path(images_directory) / "Contact Sheet.docx"
-        print(" 2 - Create New Photo Log")
+        print(f" {highlight.bold('2')} - Create New Photo Log")
         valid_actions.append("2")
         if csv_file.is_file():
-            print(" 3 - View CSV File")
+            print(f" {highlight.bold('3')} - View CSV File")
             valid_actions.append("3")
-            print(" 4 - Copy and Rename Photos")
+            print(f" {highlight.bold('4')} - Copy and Rename Photos")
             valid_actions.append("4")
-            print(" 5 - Annotate and Rename Photos")
+            print(f" {highlight.bold('5')} - Annotate and Rename Photos")
             valid_actions.append("5")
-            print(" 6 - Create Contact Sheet")
+            print(f" {highlight.bold('6')} - Create Contact Sheet")
             valid_actions.append("6")
             if word_doc.is_file():
-                print(" 7 - View Contact Sheet")
+                print(f" {highlight.bold('7')} - View Contact Sheet")
                 valid_actions.append("7")
     print("     ------------")
-    print(" E - Edit Configs")
+    print(f" {highlight.bold('E')} - Edit Configs")
     valid_actions.append("E")
-    print(" Q - Quit")
+    print(f" {highlight.bold('Q')} - Quit")
     valid_actions.append("Q")
     print("----------------------------")
     return input("> ").upper()
@@ -191,9 +199,9 @@ def _read_configs() -> None:
     with open("configs.ini", "w") as f:
         configs.write(f)
     if not shutil.which(configs.get("EXIFTOOL", "exiftool")):
-        print("NOTICE:")
+        print("\n")
         print(
-            "exiftool not found at the location indicated in the configs.ini file. Install it (https://exiftool.org) or enter “E” to edit the configs and update its path."
+            f"{highlight.red('NOTICE:')}\nExiftool not found at the location indicated in the configs.ini file.\nInstall it according to the instructions in the README file or enter “E” to edit the configs and update its path."
         )
 
 
@@ -378,7 +386,7 @@ def create_csv() -> None:
     print("“Photo Log.csv” created.")
     if errors:
         print("\n")
-        print("NOTICE: The following photos had corrupted or incomplete EXIF data.")
+        print(f"{highlight.red('NOTICE:')} The following photos had corrupted or incomplete EXIF data.")
         for each_error in errors:
             print(f"- {each_error}")
         print("\n")
@@ -441,7 +449,6 @@ def edit_configs() -> None:
     exiftool = input(f"[{configs.get('EXIFTOOL', 'exiftool')}] > ")
     if exiftool:
         configs.set("EXIFTOOL", "exiftool", exiftool)
-        # TODO: use shutil.which() to check the validity of the path
 
     # papersize
     print("Enter the paper size for Word docs.")
@@ -535,7 +542,8 @@ def load_photos() -> None:
             images.sort()
     if len(images) == 0:
         images_directory = ""
-        print("\nNOTICE: There were no valid JPEG images in the selected directory.")
+        print("\n")
+        print(f"{highlight.red('NOTICE:')} There were no valid JPEG images in the selected directory.")
     else:
         bad_photos = []
         tags = [
@@ -571,8 +579,9 @@ def load_photos() -> None:
                 # Windows will cause exiftool to choke on unicode characters in the file name.
                 bad_photos.append(each_image)
         if bad_photos:
+            print("\n")
             print(
-                "\nNOTICE: The following photos couldn’t be read. They probably have unicode characters in their file names."
+                f"{highlight.red('NOTICE:')} The following photos couldn’t be read. They probably have unicode characters in their file names."
             )
             for each_bad_photo in bad_photos:
                 print(f" - {each_bad_photo}")
@@ -663,6 +672,8 @@ def view_word_doc() -> None:
 
 
 def main() -> None:
+    if platform.system() == "Windows":
+        os.system("highlight")
     _read_configs()
     action = ""
     while action not in valid_actions:
