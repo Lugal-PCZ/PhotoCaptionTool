@@ -74,3 +74,7 @@ The first time that you run PhotoCaptionTool it will create a generic configs.in
     * _fine_ (N, NNE, NE, ENE, E, and so-on)
     * _precise_ (the actual bearing, in degrees)
 
+* **format**  
+  Edit this value to change the way that files are renamed. The options are:
+    * _1_ (Subject -- Photographer_Photo.jpg)
+    * _2_ (Site_Subject_Sequence.jpg)

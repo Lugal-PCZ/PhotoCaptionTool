@@ -22,11 +22,14 @@ all_images_exif_data = {}
 rotation = ["1", "8", "3", "6"]  # Rotation of images, as represented in EXIF
 valid_actions = []
 
+
 class highlight:
     def red(thetext):
         return f"\033[31m{thetext}\033[0m"
+
     def green(thetext):
         return f"\033[32m{thetext}\033[0m"
+
     def bold(thetext):
         return f"\033[1m{thetext}\033[0m"
 
@@ -160,12 +163,11 @@ def _read_configs() -> None:
         with open("configs.ini", "w") as f:
             pass
     configs.read("configs.ini")
-    if not configs.has_section("EXIFTOOL"):
-        configs.add_section("EXIFTOOL")
-    if not configs.has_section("DEFAULTS"):
-        configs.add_section("DEFAULTS")
-    if not configs.has_section("FACING"):
-        configs.add_section("FACING")
+    sections = ["EXIFTOOL", "DEFAULTS", "FACING", "RENAMING"]
+    for each_section in sections:
+        if not configs.has_section(each_section):
+            configs.add_section(each_section)
+    # EXIFTOOL section settings
     if not configs.has_option("EXIFTOOL", "exiftool"):
         if platform.system() == "Linux":
             configs.set("EXIFTOOL", "# Linux standard location of exiftool in $PATH")
@@ -179,6 +181,7 @@ def _read_configs() -> None:
                 "# Windows recommended location of exiftool in PhotoCaptionTool folder",
             )
             configs.set("EXIFTOOL", "exiftool", "exiftool.exe")
+    # DEFAULTS section settings
     if not configs.has_option("DEFAULTS", "papersize"):
         configs.set("DEFAULTS", "# papersize options are 'a4' and 'letter'")
         configs.set("DEFAULTS", "papersize", "a4")
@@ -190,18 +193,25 @@ def _read_configs() -> None:
         configs.set("DEFAULTS", "project", "")
     if not configs.has_option("DEFAULTS", "site"):
         configs.set("DEFAULTS", "site", "")
+    # FACING section settings
     if not configs.has_option("FACING", "precision"):
         configs.set("FACING", "# precision options are")
         configs.set("FACING", "#   'coarse' (N, NE, E, SE, S, SW, W, NW)")
         configs.set("FACING", "#   'fine' (N, NNE, NE, ENE, E, and so-on)")
         configs.set("FACING", "#   'precise' (the actual bearing, in degrees)")
         configs.set("FACING", "precision", "coarse")
+    # RENAMING section settings
+    if not configs.has_option("RENAMING", "format"):
+        configs.set("RENAMING", "# format options are")
+        configs.set("RENAMING", "#   '1' (Subject -- Photographer_Photo.jpg)")
+        configs.set("RENAMING", "#   '2' (Site_Subject_Sequence.jpg)")
+        configs.set("RENAMING", "format", "1")
     with open("configs.ini", "w") as f:
         configs.write(f)
     if not shutil.which(configs.get("EXIFTOOL", "exiftool")):
         print("\n")
         print(
-            f"{highlight.red('NOTICE:')}\nExiftool not found at the location indicated in the configs.ini file.\nInstall it according to the instructions in the README file or enter “E” to edit the configs and update its path."
+            f"{highlight.red('NOTICE:')}\nExifTool not found at the location indicated in the configs.ini file.\nInstall it according to the instructions in the README file or enter “E” to edit the configs and update its path."
         )
 
 
@@ -253,16 +263,16 @@ def annotate_photos() -> None:
                 fill=(255, 255, 255),
                 spacing=20,
             )
-            filename = each_photo["Photo"].split(".")[:-1]
-            filename[-1] = f"{filename[-1]}_Annotated"
-            if each_photo["Subject"]:
-                if each_photo["Photographer"]:
-                    filename[
-                        -1
-                    ] = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{filename[-1]}"
-                else:
-                    filename[-1] = f"{each_photo['Subject']} -- {filename[-1]}"
-            filename = f"{'.'.join(filename)}.jpg"
+            filename = ".".join(each_photo["Photo"].split(".")[:-1])
+            if configs.get("RENAMING", "format") == "1":
+                if each_photo["Subject"]:
+                    if each_photo["Photographer"]:
+                        filename = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{filename}"
+                    else:
+                        filename = f"{each_photo['Subject']} -- {filename}"
+            elif configs.get("RENAMING", "format") == "2":
+                filename = f"{each_photo['Site']}_{each_photo['Subject']}_{each_photo['Sequence']}.jpg"
+            filename = f"{filename}_Annotated.jpg"
             img.save(
                 Path(output_dir) / filename,
                 quality=80,
@@ -309,6 +319,7 @@ def create_csv() -> None:
         "Facing",
         "Subject",
         "Description",
+        "Sequence",
     ]
     if not all_images_exif_data:
         main()
@@ -321,6 +332,7 @@ def create_csv() -> None:
         main()
     data_for_csv = []
     errors = []
+    sequence = 1
     for each_image in all_images_exif_data:
         image_data = {"Photo": each_image}
         try:
@@ -376,9 +388,11 @@ def create_csv() -> None:
                 )
             else:
                 image_data["Description"] = caption
+            image_data["Sequence"] = f"{sequence:03d}"
         except:
             errors.append(each_image)
         data_for_csv.append(image_data)
+        sequence += 1
     with open(csv_file, "w", newline="") as f:
         csv_out = csv.DictWriter(f, fieldnames=headers)
         csv_out.writeheader()
@@ -386,7 +400,9 @@ def create_csv() -> None:
     print("“Photo Log.csv” created.")
     if errors:
         print("\n")
-        print(f"{highlight.red('NOTICE:')} The following photos had corrupted or incomplete EXIF data.")
+        print(
+            f"{highlight.red('NOTICE:')} The following photos had corrupted or incomplete EXIF data."
+        )
         for each_error in errors:
             print(f"- {each_error}")
         print("\n")
@@ -503,10 +519,22 @@ def edit_configs() -> None:
             print(
                 "Invalid option entered. Please enter either coarse, fine, or precise."
             )
-            precision = input(f"[{configs.get('FACING', 'precision')}] > ")
+            precision = input(f"[{configs.get('FACING', 'precision')}] > ").lower()
             if not precision:
                 precision = configs.get("FACING", "precision")
         configs.set("FACING", "precision", precision)
+
+    # format
+    print("Enter the format for renamed photos.")
+    print("(options are 1 or 2)")
+    format = input(f"[{configs.get('RENAMING', 'format')}] > ")
+    if format:
+        while format not in ["1", "2"]:
+            print("Invalid option entered. Please enter either 1 or 2.")
+            format = input(f"[{configs.get('RENAMING', 'format')}] > ")
+            if not format:
+                format = configs.get("RENAMING", "format")
+        configs.set("RENAMING", "format", format)
 
     with open("configs.ini", "w") as f:
         configs.write(f)
@@ -543,7 +571,9 @@ def load_photos() -> None:
     if len(images) == 0:
         images_directory = ""
         print("\n")
-        print(f"{highlight.red('NOTICE:')} There were no valid JPEG images in the selected directory.")
+        print(
+            f"{highlight.red('NOTICE:')} There were no valid JPEG images in the selected directory."
+        )
     else:
         bad_photos = []
         tags = [
@@ -609,17 +639,20 @@ def rename_photos() -> None:
         i = 1
         for each_photo in reader:
             print(f"{i}: Renaming photo {each_photo['Photo']}.")
-            filename = each_photo["Photo"].split(".")[:-1]
-            new_photo_name = f"{'.'.join(filename)}.jpg"
-            if each_photo["Subject"]:
-                if each_photo["Photographer"]:
-                    new_photo_name = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{new_photo_name}"
-                else:
-                    new_photo_name = f"{each_photo['Subject']} -- {new_photo_name}"
-            if each_photo["Photo"][-4:].upper() == "HEIC":
+            filename = ".".join(each_photo["Photo"].split(".")[:-1])
+            if configs.get("RENAMING", "format") == "1":
+                if each_photo["Subject"]:
+                    if each_photo["Photographer"]:
+                        filename = f"{each_photo['Subject']} -- {each_photo['Photographer']}_{filename}"
+                    else:
+                        filename = f"{each_photo['Subject']} -- {filename}"
+            elif configs.get("RENAMING", "format") == "2":
+                filename = f"{each_photo['Site']}_{each_photo['Subject']}_{each_photo['Sequence']}.jpg"
+            filename = f"{filename}.jpg"
+            if each_photo["Photo"].split(".")[-1].upper() == "HEIC":
                 img = Image.open(Path(images_directory) / each_photo["Photo"])
                 img.save(
-                    Path(output_dir) / new_photo_name,
+                    Path(output_dir) / filename,
                     quality=80,
                     optimize=True,
                     progressive=True,
@@ -628,7 +661,7 @@ def rename_photos() -> None:
             else:
                 shutil.copy2(
                     Path(images_directory) / each_photo["Photo"],
-                    Path(output_dir) / new_photo_name,
+                    Path(output_dir) / filename,
                 )
             caption = _build_new_caption(
                 each_photo["Project"],
@@ -645,7 +678,7 @@ def rename_photos() -> None:
                     f"-description={caption}",
                     "--usercomment",
                     "-overwrite_original",
-                    Path(output_dir) / new_photo_name,
+                    Path(output_dir) / filename,
                 ],
                 capture_output=True,
             )
