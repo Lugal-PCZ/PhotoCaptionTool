@@ -39,17 +39,20 @@ PhotoCaptionTool hasn’t yet been tested on Linux, but you should be able to in
 2. Run PhotoCaptionTool with the following command:  
    (_Windows_) ```python photo_caption_tool.py```  
    (_MacOS / Linux_) ```python3 photo_caption_tool.py```
-3. Enter 1 to load a folder full of JPEGs.
-4. Type the path to the folder of JPEGs or drag that folder onto the command window, then press enter.
-5. Enter 2 to create a photo log.
-6. Enter 3 or double-click on the “Photo Log.csv” file in the JPEGs folder to view and edit the photo log.
-7. Edit the photo log as necessary and save your changes.
-8. (_optional_) Enter 4 to copy the the unmodified JPEGs into a “Renamed Photos” folder, with the subject and photographer prepended to the file names. HEIC files will be automatically converted to JPEGs.
-9. (_optional_) Enter 5 to created annotated versions of the JPEGs, saved to an “Annotated Photos” folder, with the subject and photographer prepended to the file names. HEIC files will be automatically converted to JPEGs.
-10. (_optional_) Enter 6 to create a Word doc with the photos with captions taken from the photo log. You can then enter 7 or double-click the Word doc to view it.
+   You will be presented with PhotoCaptionTool’s main menu.
+3. (_optional_) Enter E to edit PhotoCaptionTool’s presets (_see below_).
+4. Enter 1 to load a folder full of JPEGs.
+5. Type the path to the folder of JPEGs or drag that folder onto the command window, then press enter.
+6. Enter 2 to create a photo log.
+7. Enter 3 or double-click on the “Photo Log.csv” file in the source folder to view and edit the photo log.
+8. Edit the photo log as necessary and save your changes.
+9. (_optional_) Enter 4 to copy the the unmodified JPEGs into a “Renamed Photos” folder, with the naming convention indicated in PhotoCaptionTool’s presets (_see below_). HEIC files will be automatically converted to JPEGs.
+10. (_optional_) Enter 5 to created annotated versions of the JPEGs, saved to an “Annotated Photos” folder, with the naming convention indicated in PhotoCaptionTool’s presets (_see below_). HEIC files will be automatically converted to JPEGs.
+11. (_optional_) Enter 6 to create a Word doc with the photos with captions taken from the photo log. You can then enter 7 or double-click the Word doc in the source folder to view it.
+12. Repeat steps 3 through 11 as necessary, or enter Q to quit.
 
-## Editing the configs.ini File
-The first time that you run PhotoCaptionTool it will create a generic configs.ini file in the PhotoCaptionTool folder. You can then edit that configs.ini file to preset data and tailor the way that the script generates its outputs. The available options are:
+## Editing PhotoCaptionTool’s Presets
+The first time that you run PhotoCaptionTool it will create a generic configs.ini file in the PhotoCaptionTool folder. You can then edit that configs.ini file directly prior to running PhotoCaptionTool or press E at its main menu to preset data and tailor the way that the script generates its outputs. The available options are:
 * **exiftool**  
   Edit this value to change the path to exiftool, if it is not installed in the default location.
 
